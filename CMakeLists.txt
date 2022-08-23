@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.17)
 project(test_opencv)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 
 set(BUILD_opencv_world ON)
 set(BUILD_PERF_TESTS OFF)
@@ -27,7 +27,8 @@ FetchContent_Declare(
     opencv
     GIT_REPOSITORY https://github.com/opencv/opencv.git
     GIT_TAG	4.6.0
-    GIT_PROGRESS TRUE
+    GIT_PROGRESS   TRUE
+    GIT_SHALLOW    TRUE 
 )
 # FetchContent_GetProperties(opencv)
 # if (NOT opencv_POPULATED)
@@ -54,7 +55,8 @@ FetchContent_Declare(
     boostorg
     GIT_REPOSITORY https://github.com/boostorg/boost.git
     GIT_TAG        boost-1.80.0
-    GIT_PROGRESS TRUE
+    GIT_PROGRESS   TRUE
+    GIT_SHALLOW    TRUE 
 )
 # FetchContent_MakeAvailable(boostorg)
 # find_package(Boost 1.80.0)
