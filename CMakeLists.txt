@@ -73,6 +73,10 @@ endif ()
 
 collect_include_dirs(BOOST_INCLUDE_DIRS ${boostorg_SOURCE_DIR}/libs)
 
-add_executable(test_opencv main.cpp)
+add_executable(image_to_cad main.cpp)
+target_link_libraries(image_to_cad PRIVATE opencv_world)
+target_include_directories(image_to_cad PRIVATE ${OPENCV_INCLUDE_DIRS} ${BOOST_INCLUDE_DIRS})
+
+add_executable(test_opencv test.cpp)
 target_link_libraries(test_opencv PRIVATE opencv_world)
 target_include_directories(test_opencv PRIVATE ${OPENCV_INCLUDE_DIRS} ${BOOST_INCLUDE_DIRS})
