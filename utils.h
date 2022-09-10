@@ -13,10 +13,9 @@
     auto CAT(__start, __LINE__) = std::chrono::high_resolution_clock::now();                                           \
     function;                                                                                                          \
     auto CAT(__end, __LINE__) = std::chrono::high_resolution_clock::now();                                             \
-    std::cout                                                                                                          \
-        << prefix << "Finished " << name << " in: "                                                                    \
-        << std::chrono::duration_cast<std::chrono::seconds>(CAT(__end, __LINE__) - CAT(__start, __LINE__)).count()     \
-        << " seconds" << std::endl;
+    std::cout << prefix << "Finished " << name                                                                         \
+              << " in: " << std::chrono::duration<double>(CAT(__end, __LINE__) - CAT(__start, __LINE__)).count()       \
+              << " seconds" << std::endl;
 
 #define TIMED_FUNCTION(function, name) TIMED_FUNCTION_WITH_PREFIX(function, name, "")
 
