@@ -1,0 +1,6 @@
+﻿---
+BasedOnStyle: Microsoft
+ConstructorInitializerAllOnOneLineOrOnePerLine: 'false'
+BreakConstructorInitializers: BeforeComma
+IndentPPDirectives: BeforeHash
+...
