@@ -18,7 +18,6 @@ int main(int argc, char **argv)
 
     Image image; // variable image of datatype Matrix
     image = load_image("C:/technion/image_to_cad_cpp/xPhys.ppm");
-
     cv::imwrite("C:/technion/image_to_cad_cpp/results/original.png", image);
 
     TIMED_FUNCTION(PreprocessImage preprocess_image(image, 4, 4), "Preprocessing");
@@ -27,7 +26,6 @@ int main(int argc, char **argv)
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
-
     std::cout << std::endl << "Finished all in: " << elapsed.count() << " seconds" << std::endl;
 
     return 0;

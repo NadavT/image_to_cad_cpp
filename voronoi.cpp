@@ -1,6 +1,9 @@
 #include "voronoi.h"
 
+#include <boost/polygon/polygon.hpp>
+
 #include "utils.h"
+#include "voronoi_visual_utils.hpp"
 
 namespace boost
 {
@@ -36,8 +39,66 @@ template <> struct segment_traits<std::vector<cv::Point>>
         return dir.to_int() ? segment[1] : segment[0];
     }
 };
+
+template <> struct segment_mutable_traits<std::vector<cv::Point>>
+{
+    typedef typename segment_traits<std::vector<cv::Point>>::coordinate_type coordinate_type;
+    typedef typename segment_traits<std::vector<cv::Point>>::point_type point_type;
+
+    static inline void set(std::vector<cv::Point> &segment, direction_1d dir, const point_type &point)
+    {
+        if (dir.to_int())
+        {
+            segment[1] = point;
+        }
+        else
+        {
+            segment[0] = point;
+        }
+    }
+
+    static inline std::vector<cv::Point> construct(const point_type &low, const point_type &high)
+    {
+        return {low, high};
+    }
+};
+
 } // namespace polygon
 } // namespace boost
+
+point_type VoronoiCalculator::retrieve_point(const cell_type &cell)
+{
+    source_index_type index = cell.source_index();
+    source_category_type category = cell.source_category();
+    assert(category != boost::polygon::SOURCE_CATEGORY_SINGLE_POINT);
+    if (category == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT)
+    {
+        return boost::polygon::low(m_segments[index]);
+    }
+    else
+    {
+        return boost::polygon::high(m_segments[index]);
+    }
+}
+
+segment_type VoronoiCalculator::retrieve_segment(const cell_type &cell)
+{
+    source_index_type index = cell.source_index();
+    return m_segments[index];
+}
+
+using namespace boost::polygon;
+
+void VoronoiCalculator::sample_curved_edge(const edge_type &edge, std::vector<point_type> *sampled_edge)
+{
+    coordinate_type max_dist = 0;
+    point_type point =
+        edge.cell()->contains_point() ? retrieve_point(*edge.cell()) : retrieve_point(*edge.twin()->cell());
+    segment_type segment =
+        edge.cell()->contains_point() ? retrieve_segment(*edge.twin()->cell()) : retrieve_segment(*edge.cell());
+    segment_data<coordinate_type> segment_a(segment[0], segment[1]);
+    voronoi_visual_utils<coordinate_type>::discretize(point, segment_a, max_dist, sampled_edge);
+}
 
 VoronoiCalculator::VoronoiCalculator(const Image &image, const Segments &segments)
     : m_image(image)
@@ -121,8 +182,28 @@ void VoronoiCalculator::draw_graph()
                         cv::line(image2, cv::Point(start->x(), start->y()), cv::Point(end->x(), end->y()),
                                  cv::Scalar(0, 0, 255), line_width);
                     }
+                    // TODO: Fixed parabolic solver
+                    // if (check_mask(start->x(), start->y()) && check_mask(end->x(), end->y()))
+                    // {
+                    //     std::vector<cv::Point> samples(
+                    //         {cv::Point(start->x(), start->y()), cv::Point(end->x(), end->y())});
+                    //     sample_curved_edge(*edge, &samples);
+                    //     for (std::size_t i = 1; i < samples.size(); ++i)
+                    //     {
+                    //         point_type vertex0 = samples[i - 1];
+                    //         point_type vertex1 = samples[i];
+                    //         if (vertex0.x >= 0 && vertex0.x <= width && vertex0.y >= 0 && vertex0.y <= height &&
+                    //             vertex1.x >= 0 && vertex1.x <= width && vertex1.y >= 0 && vertex1.y <= height)
+                    //         {
+                    //             if (check_mask(vertex0.x, vertex0.y) && check_mask(vertex1.x, vertex1.y))
+                    //             {
+                    //                 cv::line(image_vor, vertex0, vertex1, cv::Scalar(0, 0, 255), line_width);
+                    //                 cv::line(image2, vertex0, vertex1, cv::Scalar(0, 0, 255), line_width);
+                    //             }
+                    //         }
+                    //     }
+                    // }
                     assert(edge->cell()->source_category() != SOURCE_CATEGORY_SINGLE_POINT);
-                    // point_type point =
                 }
             }
             edge = edge->next();
