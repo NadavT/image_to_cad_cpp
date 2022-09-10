@@ -26,24 +26,27 @@ Set(FETCHCONTENT_QUIET FALSE)
 FetchContent_Declare(
     opencv
     GIT_REPOSITORY https://github.com/opencv/opencv.git
-    GIT_TAG	4.6.0
-    GIT_PROGRESS   TRUE
-    GIT_SHALLOW    TRUE 
+    GIT_TAG 4.6.0
+    GIT_PROGRESS TRUE
+    GIT_SHALLOW TRUE
 )
+
 # FetchContent_GetProperties(opencv)
 # if (NOT opencv_POPULATED)
-#     FetchContent_Populate(opencv)
+# FetchContent_Populate(opencv)
 # endif ()
 FetchContent_MakeAvailable(opencv)
 
 macro(collect_include_dirs result curdir)
     file(GLOB children ${curdir}/*)
     set(dirlist "")
+
     foreach(child ${children})
         if(IS_DIRECTORY ${child})
             list(APPEND dirlist ${child}/include)
         endif()
     endforeach()
+
     set(${result} ${dirlist})
 endmacro()
 
@@ -54,10 +57,11 @@ set(BOOST_ENABLE_CMAKE ON)
 FetchContent_Declare(
     boostorg
     GIT_REPOSITORY https://github.com/boostorg/boost.git
-    GIT_TAG        boost-1.80.0
-    GIT_PROGRESS   TRUE
-    GIT_SHALLOW    TRUE 
+    GIT_TAG boost-1.80.0
+    GIT_PROGRESS TRUE
+    GIT_SHALLOW TRUE
 )
+
 # FetchContent_MakeAvailable(boostorg)
 # find_package(Boost 1.80.0)
 # # FetchContent_GetProperties(boostorg)
@@ -66,14 +70,15 @@ FetchContent_Declare(
 # #    add_subdirectory(${boostorg_SOURCE_DIR} ${boostorg_BINARY_DIR} EXCLUDE_FROM_ALL)
 # # endif ()
 FetchContent_GetProperties(boostorg)
-if (NOT boostorg_POPULATED)
+
+if(NOT boostorg_POPULATED)
     FetchContent_Populate(boostorg)
     add_subdirectory(${boostorg_SOURCE_DIR} ${boostorg_BINARY_DIR})
-endif ()
+endif()
 
 collect_include_dirs(BOOST_INCLUDE_DIRS ${boostorg_SOURCE_DIR}/libs)
 
-add_executable(image_to_cad main.cpp preprocess.cpp)
+add_executable(image_to_cad main.cpp preprocess.cpp voronoi.cpp)
 target_link_libraries(image_to_cad PRIVATE opencv_world)
 target_include_directories(image_to_cad PRIVATE ${OPENCV_INCLUDE_DIRS} ${BOOST_INCLUDE_DIRS})
 

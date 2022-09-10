@@ -4,14 +4,16 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 
+#include "types.h"
+
 class PreprocessImage
 {
   public:
-    PreprocessImage(const cv::Mat &image, double scale_factor, double island_threshold);
+    PreprocessImage(const Image &image, double scale_factor, double island_threshold);
 
-    cv::Mat &get_colored_image();
-    cv::Mat &get_grayscale_image();
-    std::vector<std::vector<cv::Point>> &get_segments();
+    Image &get_colored_image();
+    Image &get_grayscale_image();
+    Segments &get_segments();
     std::vector<cv::Vec4i> &get_hierarchy();
 
   private:
@@ -21,17 +23,14 @@ class PreprocessImage
     void find_segments();
 
   private:
-    cv::Mat m_colored_image;
-    cv::Mat m_grayscale_image;
-    std::vector<std::vector<cv::Point>> m_segments;
+    Image m_colored_image;
+    Image m_grayscale_image;
+    Segments m_segments;
     std::vector<cv::Vec4i> m_hierarchy;
     double m_scale_factor;
     double m_island_threshold;
 
     std::vector<std::vector<bool>> m_checked;
 };
-
-std::tuple<cv::Mat, cv::Mat, std::vector<std::vector<cv::Point>>, std::vector<cv::Vec4i>> preprocess_image(
-    cv::Mat &image, double scale_factor, double islands_threshold);
 
 #endif /* PREPROCESS_H */

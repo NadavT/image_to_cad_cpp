@@ -5,7 +5,7 @@
 
 #include "utils.h"
 
-PreprocessImage::PreprocessImage(const cv::Mat &image, double scale_factor, double island_threshold)
+PreprocessImage::PreprocessImage(const Image &image, double scale_factor, double island_threshold)
     : m_grayscale_image(image)
     , m_scale_factor(scale_factor)
     , m_island_threshold(island_threshold)
@@ -19,8 +19,6 @@ PreprocessImage::PreprocessImage(const cv::Mat &image, double scale_factor, doub
     TIMED_INNER_FUNCTION(find_segments(), "finding segments");
 
     cv::drawContours(m_colored_image, m_segments, -1, {0xff, 0, 0}, 1);
-    // cv::namedWindow("contours", cv::WINDOW_NORMAL);
-    // cv::imshow("contours", image);
     cv::imwrite("C:/technion/image_to_cad_cpp/results/contours.png", m_colored_image);
 }
 
