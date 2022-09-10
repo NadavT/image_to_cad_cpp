@@ -66,40 +66,6 @@ template <> struct segment_mutable_traits<std::vector<cv::Point>>
 } // namespace polygon
 } // namespace boost
 
-point_type VoronoiCalculator::retrieve_point(const cell_type &cell)
-{
-    source_index_type index = cell.source_index();
-    source_category_type category = cell.source_category();
-    assert(category != boost::polygon::SOURCE_CATEGORY_SINGLE_POINT);
-    if (category == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT)
-    {
-        return boost::polygon::low(m_segments[index]);
-    }
-    else
-    {
-        return boost::polygon::high(m_segments[index]);
-    }
-}
-
-segment_type VoronoiCalculator::retrieve_segment(const cell_type &cell)
-{
-    source_index_type index = cell.source_index();
-    return m_segments[index];
-}
-
-using namespace boost::polygon;
-
-void VoronoiCalculator::sample_curved_edge(const edge_type &edge, std::vector<point_type> *sampled_edge)
-{
-    coordinate_type max_dist = 0;
-    point_type point =
-        edge.cell()->contains_point() ? retrieve_point(*edge.cell()) : retrieve_point(*edge.twin()->cell());
-    segment_type segment =
-        edge.cell()->contains_point() ? retrieve_segment(*edge.twin()->cell()) : retrieve_segment(*edge.cell());
-    segment_data<coordinate_type> segment_a(segment[0], segment[1]);
-    voronoi_visual_utils<coordinate_type>::discretize(point, segment_a, max_dist, sampled_edge);
-}
-
 VoronoiCalculator::VoronoiCalculator(const Image &image, const Segments &segments)
     : m_image(image)
     , m_segments(segments)
@@ -143,6 +109,11 @@ double VoronoiCalculator::distance_to_edge(cv::Point point, cv::Point edge_start
     return numerator / denominator;
 }
 
+double VoronoiCalculator::distance(cv::Point p1, cv::Point p2)
+{
+    return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y, 2));
+}
+
 void VoronoiCalculator::draw_graph()
 {
     int width = m_image.cols;
@@ -157,6 +128,10 @@ void VoronoiCalculator::draw_graph()
     for (const auto &cell : m_diagram.cells())
     {
         auto *edge = cell.incident_edge();
+        if (!edge)
+        {
+            continue;
+        }
         do
         {
             auto *start = edge->vertex0();
@@ -165,22 +140,32 @@ void VoronoiCalculator::draw_graph()
             {
                 if (edge->is_linear())
                 {
-                    if (check_mask(start->x(), start->y()) && check_mask(end->x(), end->y()))
+                    if (start != end && check_mask(start->x(), start->y()) && check_mask(end->x(), end->y()))
                     {
-                        cv::line(image_vor, cv::Point(start->x(), start->y()), cv::Point(end->x(), end->y()),
-                                 cv::Scalar(0, 0, 255), line_width);
-                        cv::line(image2, cv::Point(start->x(), start->y()), cv::Point(end->x(), end->y()),
-                                 cv::Scalar(0, 0, 255), line_width);
+                        cv::Point u(start->x(), start->y());
+                        cv::Point v(end->x(), end->y());
+                        cv::line(image_vor, u, v, cv::Scalar(0, 0, 255), line_width);
+                        cv::line(image2, u, v, cv::Scalar(0, 0, 255), line_width);
+                        auto u_desc = boost::add_vertex(u, m_graph);
+                        m_vertex_descriptor_map[u] = u_desc;
+                        auto v_desc = boost::add_vertex(v, m_graph);
+                        m_vertex_descriptor_map[v] = v_desc;
+                        boost::add_edge(u_desc, v_desc, distance(u, v), m_graph);
                     }
                 }
                 else
                 {
                     if (check_mask(start->x(), start->y()) && check_mask(end->x(), end->y()))
                     {
-                        cv::line(image_vor, cv::Point(start->x(), start->y()), cv::Point(end->x(), end->y()),
-                                 cv::Scalar(0, 0, 255), line_width);
-                        cv::line(image2, cv::Point(start->x(), start->y()), cv::Point(end->x(), end->y()),
-                                 cv::Scalar(0, 0, 255), line_width);
+                        cv::Point u(start->x(), start->y());
+                        cv::Point v(end->x(), end->y());
+                        cv::line(image_vor, u, v, cv::Scalar(0, 0, 255), line_width);
+                        cv::line(image2, u, v, cv::Scalar(0, 0, 255), line_width);
+                        auto u_desc = boost::add_vertex(u, m_graph);
+                        m_vertex_descriptor_map[u] = u_desc;
+                        auto v_desc = boost::add_vertex(v, m_graph);
+                        m_vertex_descriptor_map[v] = v_desc;
+                        boost::add_edge(u_desc, v_desc, distance(u, v), m_graph);
                     }
                     // TODO: Fixed parabolic solver
                     // if (check_mask(start->x(), start->y()) && check_mask(end->x(), end->y()))
@@ -203,7 +188,7 @@ void VoronoiCalculator::draw_graph()
                     //         }
                     //     }
                     // }
-                    assert(edge->cell()->source_category() != SOURCE_CATEGORY_SINGLE_POINT);
+                    assert(edge->cell()->source_category() != boost::polygon::SOURCE_CATEGORY_SINGLE_POINT);
                 }
             }
             edge = edge->next();
@@ -211,4 +196,51 @@ void VoronoiCalculator::draw_graph()
     }
     cv::imwrite("C:/technion/image_to_cad_cpp/results/voronoi.png", image_vor);
     cv::imwrite("C:/technion/image_to_cad_cpp/results/voronoi2.png", image2);
+
+    cv::Mat image_graph(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
+
+    auto edges = boost::edges(m_graph);
+
+    for (auto it = edges.first; it != edges.second; ++it)
+    {
+        auto u = m_graph[boost::source(*it, m_graph)];
+        auto v = m_graph[boost::target(*it, m_graph)];
+        cv::line(image_graph, u, v, cv::Scalar(0, 0, 255), line_width);
+    }
+
+    cv::imwrite("C:/technion/image_to_cad_cpp/results/voronoi3.png", image_graph);
+}
+
+point_type VoronoiCalculator::retrieve_point(const cell_type &cell)
+{
+    source_index_type index = cell.source_index();
+    source_category_type category = cell.source_category();
+    assert(category != boost::polygon::SOURCE_CATEGORY_SINGLE_POINT);
+    if (category == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT)
+    {
+        return boost::polygon::low(m_segments[index]);
+    }
+    else
+    {
+        return boost::polygon::high(m_segments[index]);
+    }
+}
+
+segment_type VoronoiCalculator::retrieve_segment(const cell_type &cell)
+{
+    source_index_type index = cell.source_index();
+    return m_segments[index];
+}
+
+using namespace boost::polygon;
+
+void VoronoiCalculator::sample_curved_edge(const edge_type &edge, std::vector<point_type> *sampled_edge)
+{
+    coordinate_type max_dist = 0;
+    point_type point =
+        edge.cell()->contains_point() ? retrieve_point(*edge.cell()) : retrieve_point(*edge.twin()->cell());
+    segment_type segment =
+        edge.cell()->contains_point() ? retrieve_segment(*edge.twin()->cell()) : retrieve_segment(*edge.cell());
+    segment_data<coordinate_type> segment_a(segment[0], segment[1]);
+    voronoi_visual_utils<coordinate_type>::discretize(point, segment_a, max_dist, sampled_edge);
 }
