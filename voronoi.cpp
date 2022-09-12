@@ -90,6 +90,11 @@ std::unordered_map<cv::Point, VertexDescriptor> &VoronoiCalculator::get_vertex_d
     return m_vertex_descriptor_map;
 }
 
+std::unordered_set<Segment> &VoronoiCalculator::get_added_edges()
+{
+    return m_added_edges;
+}
+
 void VoronoiCalculator::calculate()
 {
     std::vector<cv::Point> points;
@@ -147,7 +152,8 @@ void VoronoiCalculator::draw_graph()
             {
                 cv::Point start_p(start->x(), start->y());
                 cv::Point end_p(end->x(), end->y());
-                if (start_p != end_p)
+                if (start_p != end_p && m_added_edges.count({start_p, end_p}) == 0 &&
+                    m_added_edges.count({end_p, start_p}) == 0)
                 {
                     if (edge->is_linear())
                     {
@@ -181,6 +187,7 @@ void VoronoiCalculator::draw_graph()
                             }
                             assert(u_desc != v_desc);
                             boost::add_edge(u_desc, v_desc, distance(start_p, end_p), m_graph);
+                            m_added_edges.insert({start_p, end_p});
                         }
                     }
                     else
@@ -215,6 +222,7 @@ void VoronoiCalculator::draw_graph()
                             }
                             assert(u_desc != v_desc);
                             boost::add_edge(u_desc, v_desc, distance(start_p, end_p), m_graph);
+                            m_added_edges.insert({start_p, end_p});
                         }
                         // TODO: Fixed parabolic solver
                         // if (check_mask(start->x(), start->y()) && check_mask(end->x(), end->y()))

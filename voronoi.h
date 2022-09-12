@@ -21,6 +21,7 @@ class VoronoiCalculator
     VoronoiDiagram &get_diagram();
     Graph &get_graph();
     VertexDescriptorMap &get_vertex_descriptor_map();
+    std::unordered_set<Segment> &get_added_edges();
 
   private:
     void calculate();
@@ -38,6 +39,7 @@ class VoronoiCalculator
     VoronoiDiagram m_diagram;
     Graph m_graph;
     VertexDescriptorMap m_vertex_descriptor_map;
+    std::unordered_set<Segment> m_added_edges;
 };
 
 #endif /* VORONOI_H */

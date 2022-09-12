@@ -26,7 +26,8 @@ int main(int argc, char **argv)
         VoronoiCalculator voronoi_calculator(preprocess_image.get_colored_image(), preprocess_image.get_segments()),
         "Calculating Voronoi");
     TIMED_FUNCTION(ProcessGraph process_graph(voronoi_calculator.get_graph(),
-                                              voronoi_calculator.get_vertex_descriptor_map(), 2, 250, 14),
+                                              voronoi_calculator.get_vertex_descriptor_map(),
+                                              voronoi_calculator.get_added_edges(), 2, 250, 14),
                    "Processing graph");
 
     auto end = std::chrono::high_resolution_clock::now();

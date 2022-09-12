@@ -3,15 +3,17 @@
 #include "math.h"
 #include "utils.h"
 
-ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, double reduction_proximity, double hanging_threshold,
-                           double junction_collapse_threshold)
+ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordered_set<Segment> &added_edges,
+                           double reduction_proximity, double hanging_threshold, double junction_collapse_threshold)
     : m_graph(graph)
     , m_vertex_descriptor_map(map)
+    , m_added_edges(added_edges)
     , m_reduction_proximity(reduction_proximity)
     , m_hanging_threshold(hanging_threshold)
     , m_junction_collapse_threshold(junction_collapse_threshold)
 {
     TIMED_INNER_FUNCTION(reduce(), "Reducing graph");
+    TIMED_INNER_FUNCTION(remove_hanging(), "Removing hanging");
 
     cv::Mat image_graph(2000, 4000, CV_8UC3, cv::Scalar(255, 255, 255));
 
@@ -85,23 +87,60 @@ void ProcessGraph::reduce()
 void ProcessGraph::remove_hanging()
 {
     bool changed = true;
+    int i = 0;
     while (changed)
     {
+        Graph new_graph(m_graph);
         changed = false;
         std::vector<VertexDescriptor> leafs;
-        for (const auto &vertex : boost::make_iterator_range(boost::vertices(m_graph)))
+        for (const auto &vertex : boost::make_iterator_range(boost::vertices(new_graph)))
         {
+            // std::cout << "degree: " << boost::out_degree(vertex, m_graph) << std::endl;
+            // for (const auto &neighbor : boost::make_iterator_range(boost::out_edges(vertex, m_graph)))
+            // {
+            //     std::cout << "\t" << m_graph[boost::source(neighbor, m_graph)].p << ", "
+            //               << m_graph[boost::target(neighbor, m_graph)].p << std::endl;
+            // }
             if (boost::degree(vertex, m_graph) == 1)
             {
                 leafs.push_back(vertex);
             }
         }
 
-        for (const auto &vertex : leafs)
+        for (const auto &leaf : leafs)
         {
-            std::vector<VertexDescriptor> to_remove({vertex});
-
+            std::vector<VertexDescriptor> to_remove({leaf});
+            auto edge = *(boost::out_edges(leaf, m_graph).first);
+            double leaf_length = m_graph[edge];
+            VertexDescriptor parent =
+                (boost::source(edge, m_graph) == leaf) ? boost::target(edge, m_graph) : boost::source(edge, m_graph);
+            VertexDescriptor prev = leaf;
+            while (boost::degree(parent, m_graph) == 2)
+            {
+                to_remove.push_back(parent);
+                auto temp = parent;
+                auto edge = (boost::out_edges(parent, m_graph).first);
+                parent = (boost::source(*edge, m_graph) == temp) ? boost::target(*edge, m_graph)
+                                                                 : boost::source(*edge, m_graph);
+                if (parent == prev)
+                {
+                    ++edge;
+                    parent = (boost::source(*edge, m_graph) == temp) ? boost::target(*edge, m_graph)
+                                                                     : boost::source(*edge, m_graph);
+                }
+                leaf_length += m_graph[*edge];
+                prev = temp;
+            }
+            if (leaf_length < m_hanging_threshold)
+            {
+                changed = true;
+                for (const auto &vertex : to_remove)
+                {
+                    boost::clear_vertex(vertex, new_graph);
+                }
+            }
         }
+        m_graph = new_graph;
     }
 }
 
@@ -120,7 +159,7 @@ void ProcessGraph::contract_edge(const Segment &edge, std::unordered_set<Segment
     {
         Vertex &collapsed = m_graph[neighbor];
         assert(collapsed.p != v);
-        if (collapsed.p == u)
+        if (collapsed.p == u || m_added_edges.count({u, collapsed.p}) > 0 || m_added_edges.count({collapsed.p, u}) > 0)
         {
             continue;
         }
@@ -133,6 +172,7 @@ void ProcessGraph::contract_edge(const Segment &edge, std::unordered_set<Segment
         assert(u != collapsed.p);
         boost::add_edge(m_vertex_descriptor_map[u], m_vertex_descriptor_map[collapsed.p], distance(u, collapsed.p),
                         m_graph);
+        m_added_edges.insert({u, collapsed.p});
 
         if (distance(u, collapsed.p) < m_reduction_proximity)
         {
