@@ -2,6 +2,7 @@
 
 #include <boost/polygon/polygon.hpp>
 
+#include "math.h"
 #include "utils.h"
 #include "voronoi_visual_utils.hpp"
 
@@ -79,6 +80,16 @@ VoronoiDiagram &VoronoiCalculator::get_diagram()
     return m_diagram;
 }
 
+Graph &VoronoiCalculator::get_graph()
+{
+    return m_graph;
+}
+
+std::unordered_map<cv::Point, VertexDescriptor> &VoronoiCalculator::get_vertex_descriptor_map()
+{
+    return m_vertex_descriptor_map;
+}
+
 void VoronoiCalculator::calculate()
 {
     std::vector<cv::Point> points;
@@ -109,11 +120,6 @@ double VoronoiCalculator::distance_to_edge(cv::Point point, cv::Point edge_start
     return numerator / denominator;
 }
 
-double VoronoiCalculator::distance(cv::Point p1, cv::Point p2)
-{
-    return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y, 2));
-}
-
 void VoronoiCalculator::draw_graph()
 {
     int width = m_image.cols;
@@ -128,6 +134,7 @@ void VoronoiCalculator::draw_graph()
     for (const auto &cell : m_diagram.cells())
     {
         auto *edge = cell.incident_edge();
+        segment_type incident_segment = m_segments[cell.source_index()];
         if (!edge)
         {
             continue;
@@ -138,57 +145,100 @@ void VoronoiCalculator::draw_graph()
             auto *end = edge->vertex1();
             if (start && end && edge->is_primary() && edge->is_finite())
             {
-                if (edge->is_linear())
+                cv::Point start_p(start->x(), start->y());
+                cv::Point end_p(end->x(), end->y());
+                if (start_p != end_p)
                 {
-                    if (start != end && check_mask(start->x(), start->y()) && check_mask(end->x(), end->y()))
+                    if (edge->is_linear())
                     {
-                        cv::Point u(start->x(), start->y());
-                        cv::Point v(end->x(), end->y());
-                        cv::line(image_vor, u, v, cv::Scalar(0, 0, 255), line_width);
-                        cv::line(image2, u, v, cv::Scalar(0, 0, 255), line_width);
-                        auto u_desc = boost::add_vertex(u, m_graph);
-                        m_vertex_descriptor_map[u] = u_desc;
-                        auto v_desc = boost::add_vertex(v, m_graph);
-                        m_vertex_descriptor_map[v] = v_desc;
-                        boost::add_edge(u_desc, v_desc, distance(u, v), m_graph);
+                        if (start != end && check_mask(start->x(), start->y()) && check_mask(end->x(), end->y()))
+                        {
+                            Vertex u = {start_p, incident_segment,
+                                        distance_to_edge(start_p, incident_segment[0], incident_segment[1])};
+                            Vertex v = {end_p, incident_segment,
+                                        distance_to_edge(end_p, incident_segment[0], incident_segment[1])};
+                            cv::line(image_vor, start_p, end_p, cv::Scalar(0, 0, 255), line_width);
+                            cv::line(image2, start_p, end_p, cv::Scalar(0, 0, 255), line_width);
+                            Graph::vertex_descriptor u_desc;
+                            Graph::vertex_descriptor v_desc;
+                            if (m_vertex_descriptor_map.count(start_p) == 0)
+                            {
+                                u_desc = boost::add_vertex(u, m_graph);
+                                m_vertex_descriptor_map[start_p] = u_desc;
+                            }
+                            else
+                            {
+                                u_desc = m_vertex_descriptor_map[start_p];
+                            }
+                            if (m_vertex_descriptor_map.count(end_p) == 0)
+                            {
+                                v_desc = boost::add_vertex(v, m_graph);
+                                m_vertex_descriptor_map[end_p] = v_desc;
+                            }
+                            else
+                            {
+                                v_desc = m_vertex_descriptor_map[end_p];
+                            }
+                            assert(u_desc != v_desc);
+                            boost::add_edge(u_desc, v_desc, distance(start_p, end_p), m_graph);
+                        }
                     }
-                }
-                else
-                {
-                    if (check_mask(start->x(), start->y()) && check_mask(end->x(), end->y()))
+                    else
                     {
-                        cv::Point u(start->x(), start->y());
-                        cv::Point v(end->x(), end->y());
-                        cv::line(image_vor, u, v, cv::Scalar(0, 0, 255), line_width);
-                        cv::line(image2, u, v, cv::Scalar(0, 0, 255), line_width);
-                        auto u_desc = boost::add_vertex(u, m_graph);
-                        m_vertex_descriptor_map[u] = u_desc;
-                        auto v_desc = boost::add_vertex(v, m_graph);
-                        m_vertex_descriptor_map[v] = v_desc;
-                        boost::add_edge(u_desc, v_desc, distance(u, v), m_graph);
+                        if (check_mask(start->x(), start->y()) && check_mask(end->x(), end->y()))
+                        {
+                            Vertex u = {start_p, incident_segment,
+                                        distance_to_edge(start_p, incident_segment[0], incident_segment[1])};
+                            Vertex v = {end_p, incident_segment,
+                                        distance_to_edge(end_p, incident_segment[0], incident_segment[1])};
+                            cv::line(image_vor, start_p, end_p, cv::Scalar(0, 0, 255), line_width);
+                            cv::line(image2, start_p, end_p, cv::Scalar(0, 0, 255), line_width);
+                            Graph::vertex_descriptor u_desc;
+                            Graph::vertex_descriptor v_desc;
+                            if (m_vertex_descriptor_map.count(start_p) == 0)
+                            {
+                                u_desc = boost::add_vertex(u, m_graph);
+                                m_vertex_descriptor_map[start_p] = u_desc;
+                            }
+                            else
+                            {
+                                u_desc = m_vertex_descriptor_map[start_p];
+                            }
+                            if (m_vertex_descriptor_map.count(end_p) == 0)
+                            {
+                                v_desc = boost::add_vertex(v, m_graph);
+                                m_vertex_descriptor_map[end_p] = v_desc;
+                            }
+                            else
+                            {
+                                v_desc = m_vertex_descriptor_map[end_p];
+                            }
+                            assert(u_desc != v_desc);
+                            boost::add_edge(u_desc, v_desc, distance(start_p, end_p), m_graph);
+                        }
+                        // TODO: Fixed parabolic solver
+                        // if (check_mask(start->x(), start->y()) && check_mask(end->x(), end->y()))
+                        // {
+                        //     std::vector<cv::Point> samples(
+                        //         {cv::Point(start->x(), start->y()), cv::Point(end->x(), end->y())});
+                        //     sample_curved_edge(*edge, &samples);
+                        //     for (std::size_t i = 1; i < samples.size(); ++i)
+                        //     {
+                        //         point_type vertex0 = samples[i - 1];
+                        //         point_type vertex1 = samples[i];
+                        //         if (vertex0.x >= 0 && vertex0.x <= width && vertex0.y >= 0 && vertex0.y <= height &&
+                        //             vertex1.x >= 0 && vertex1.x <= width && vertex1.y >= 0 && vertex1.y <= height)
+                        //         {
+                        //             if (check_mask(vertex0.x, vertex0.y) && check_mask(vertex1.x, vertex1.y))
+                        //             {
+                        //                 cv::line(image_vor, vertex0, vertex1, cv::Scalar(0, 0, 255), line_width);
+                        //                 cv::line(image2, vertex0, vertex1, cv::Scalar(0, 0, 255), line_width);
+                        //             }
+                        //         }
+                        //     }
+                        // }
+                        assert(edge->cell()->source_category() != boost::polygon::SOURCE_CATEGORY_SINGLE_POINT);
                     }
-                    // TODO: Fixed parabolic solver
-                    // if (check_mask(start->x(), start->y()) && check_mask(end->x(), end->y()))
-                    // {
-                    //     std::vector<cv::Point> samples(
-                    //         {cv::Point(start->x(), start->y()), cv::Point(end->x(), end->y())});
-                    //     sample_curved_edge(*edge, &samples);
-                    //     for (std::size_t i = 1; i < samples.size(); ++i)
-                    //     {
-                    //         point_type vertex0 = samples[i - 1];
-                    //         point_type vertex1 = samples[i];
-                    //         if (vertex0.x >= 0 && vertex0.x <= width && vertex0.y >= 0 && vertex0.y <= height &&
-                    //             vertex1.x >= 0 && vertex1.x <= width && vertex1.y >= 0 && vertex1.y <= height)
-                    //         {
-                    //             if (check_mask(vertex0.x, vertex0.y) && check_mask(vertex1.x, vertex1.y))
-                    //             {
-                    //                 cv::line(image_vor, vertex0, vertex1, cv::Scalar(0, 0, 255), line_width);
-                    //                 cv::line(image2, vertex0, vertex1, cv::Scalar(0, 0, 255), line_width);
-                    //             }
-                    //         }
-                    //     }
-                    // }
-                    assert(edge->cell()->source_category() != boost::polygon::SOURCE_CATEGORY_SINGLE_POINT);
                 }
             }
             edge = edge->next();
@@ -203,9 +253,9 @@ void VoronoiCalculator::draw_graph()
 
     for (auto it = edges.first; it != edges.second; ++it)
     {
-        auto u = m_graph[boost::source(*it, m_graph)];
-        auto v = m_graph[boost::target(*it, m_graph)];
-        cv::line(image_graph, u, v, cv::Scalar(0, 0, 255), line_width);
+        const Vertex &u = m_graph[boost::source(*it, m_graph)];
+        const Vertex &v = m_graph[boost::target(*it, m_graph)];
+        cv::line(image_graph, u.p, v.p, cv::Scalar(0, 0, 255), line_width);
     }
 
     cv::imwrite("C:/technion/image_to_cad_cpp/results/voronoi3.png", image_graph);
