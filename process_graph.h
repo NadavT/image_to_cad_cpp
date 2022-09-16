@@ -10,10 +10,14 @@ class ProcessGraph
                  double reduction_proximity, double hanging_threshold, double junction_collapse_threshold);
 
   private:
-    void reduce();
+    void reduce(double reduction_proximity);
     void remove_hanging();
+    void collapse_junctions(double junction_collapse_threshold);
 
-    void contract_edge(const Segment &edge, std::unordered_set<Segment> &small_edges);
+    std::tuple<double, std::vector<VertexDescriptor>> walk_to_next_junction(VertexDescriptor source,
+                                                                            VertexDescriptor direction);
+    void contract_edge_small_edges_update(const Segment &edge, std::unordered_set<Segment> &small_edges);
+    void contract_vertices(VertexDescriptor vertex1, VertexDescriptor vertex2);
 
   private:
     Graph m_graph;

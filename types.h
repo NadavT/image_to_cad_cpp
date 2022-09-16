@@ -22,6 +22,7 @@ struct Vertex
 using Edge = double;
 using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS, Vertex, Edge>;
 using VertexDescriptor = Graph::vertex_descriptor;
+using EdgeDescriptor = Graph::edge_descriptor;
 using VertexDescriptorMap = std::unordered_map<cv::Point, VertexDescriptor>;
 template <> struct std::hash<cv::Point>
 {

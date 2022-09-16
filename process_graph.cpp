@@ -12,8 +12,9 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
     , m_hanging_threshold(hanging_threshold)
     , m_junction_collapse_threshold(junction_collapse_threshold)
 {
-    TIMED_INNER_FUNCTION(reduce(), "Reducing graph");
+    TIMED_INNER_FUNCTION(reduce(m_reduction_proximity), "Reducing graph");
     TIMED_INNER_FUNCTION(remove_hanging(), "Removing hanging");
+    TIMED_INNER_FUNCTION(collapse_junctions(m_junction_collapse_threshold), "Collapsing junctions");
 
     cv::Mat image_graph(2000, 4000, CV_8UC3, cv::Scalar(255, 255, 255));
 
@@ -29,7 +30,7 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
     cv::imwrite("C:/technion/image_to_cad_cpp/results/voronoi4.png", image_graph);
 }
 
-void ProcessGraph::reduce()
+void ProcessGraph::reduce(double reduction_proximity)
 {
     std::unordered_set<Segment> small_edges;
 
@@ -40,7 +41,7 @@ void ProcessGraph::reduce()
         Vertex &v = m_graph[boost::target(*it, m_graph)];
         assert(u.p != v.p);
         double length = m_graph[*it];
-        if (length < m_reduction_proximity)
+        if (length < reduction_proximity)
         {
             if (u.distance_to_source >= v.distance_to_source)
             {
@@ -78,7 +79,7 @@ void ProcessGraph::reduce()
         }
 
         // std::unordered_set<Segment> new_small_edges = contract_edge(small_edge);
-        contract_edge(small_edge, small_edges);
+        contract_edge_small_edges_update(small_edge, small_edges);
         assert(small_edges.count(small_edge) > 0);
         small_edges.erase(small_edge);
     }
@@ -141,10 +142,102 @@ void ProcessGraph::remove_hanging()
             }
         }
         m_graph = new_graph;
+        reduce(4);
+
+        cv::Mat image_graph(2000, 4000, CV_8UC3, cv::Scalar(255, 255, 255));
+
+        auto edges = boost::edges(m_graph);
+
+        for (auto it = edges.first; it != edges.second; ++it)
+        {
+            const Vertex &u = m_graph[boost::source(*it, m_graph)];
+            const Vertex &v = m_graph[boost::target(*it, m_graph)];
+            cv::line(image_graph, u.p, v.p, cv::Scalar(0, 0, 255), 1);
+        }
+
+        cv::imwrite("C:/technion/image_to_cad_cpp/results/epoch" + std::to_string(i++) + ".png", image_graph);
     }
 }
 
-void ProcessGraph::contract_edge(const Segment &edge, std::unordered_set<Segment> &small_edges)
+void ProcessGraph::collapse_junctions(double junction_collapse_threshold)
+{
+    std::vector<VertexDescriptor> junctions;
+    std::set<VertexDescriptor> collapsed;
+    for (const auto &vertex : boost::make_iterator_range(boost::vertices(m_graph)))
+    {
+        if (boost::degree(vertex, m_graph) > 2)
+        {
+            junctions.push_back(vertex);
+        }
+    }
+
+    for (VertexDescriptor junction : junctions)
+    {
+        if (collapsed.count(junction) > 0)
+        {
+            continue;
+        }
+        bool reset = true;
+        while (reset)
+        {
+            reset = false;
+            for (const auto &neighbor : boost::make_iterator_range(boost::adjacent_vertices(junction, m_graph)))
+            {
+                double length = 0;
+                std::vector<VertexDescriptor> route;
+                std::tie(length, route) = walk_to_next_junction(junction, neighbor);
+                if (length < junction_collapse_threshold)
+                {
+                    for (const auto &vertex : route)
+                    {
+                        if (vertex == junction || vertex == route.back())
+                        {
+                            collapsed.insert(vertex);
+                            continue;
+                        }
+                        boost::clear_vertex(vertex, m_graph);
+                    }
+                    contract_vertices(junction, route.back());
+                    m_graph[junction].p = (m_graph[junction].p + m_graph[route.back()].p) / 2;
+                    auto incident_segment = m_graph[junction].incident_segment;
+                    m_graph[junction].distance_to_source =
+                        distance_to_edge(m_graph[junction].p, incident_segment[0], incident_segment[1]);
+                    reset = true;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+std::tuple<double, std::vector<VertexDescriptor>> ProcessGraph::walk_to_next_junction(VertexDescriptor source,
+                                                                                      VertexDescriptor direction)
+{
+    std::vector<VertexDescriptor> route({source, direction});
+    double length = distance(m_graph[source].p, m_graph[direction].p);
+    VertexDescriptor parent = direction;
+    VertexDescriptor prev = source;
+    while (boost::degree(parent, m_graph) == 2)
+    {
+        route.push_back(parent);
+        auto temp = parent;
+        auto edge = (boost::out_edges(parent, m_graph).first);
+        parent =
+            (boost::source(*edge, m_graph) == temp) ? boost::target(*edge, m_graph) : boost::source(*edge, m_graph);
+        if (parent == prev)
+        {
+            ++edge;
+            parent =
+                (boost::source(*edge, m_graph) == temp) ? boost::target(*edge, m_graph) : boost::source(*edge, m_graph);
+        }
+        length += m_graph[*edge];
+        prev = temp;
+    }
+
+    return {length, route};
+}
+
+void ProcessGraph::contract_edge_small_edges_update(const Segment &edge, std::unordered_set<Segment> &small_edges)
 {
     cv::Point u = edge[0];
     cv::Point v = edge[1];
@@ -168,10 +261,8 @@ void ProcessGraph::contract_edge(const Segment &edge, std::unordered_set<Segment
         assert(m_vertex_descriptor_map.count(collapsed.p) > 0);
         assert(m_vertex_descriptor_map[u] != m_vertex_descriptor_map[collapsed.p]);
         assert(m_vertex_descriptor_map[u] != m_vertex_descriptor_map[v]);
-        assert(m_vertex_descriptor_map[u] != m_vertex_descriptor_map[collapsed.p]);
         assert(u != collapsed.p);
-        boost::add_edge(m_vertex_descriptor_map[u], m_vertex_descriptor_map[collapsed.p], distance(u, collapsed.p),
-                        m_graph);
+        boost::add_edge(m_vertex_descriptor_map[u], neighbor, distance(u, collapsed.p), m_graph);
         m_added_edges.insert({u, collapsed.p});
 
         if (distance(u, collapsed.p) < m_reduction_proximity)
@@ -187,6 +278,8 @@ void ProcessGraph::contract_edge(const Segment &edge, std::unordered_set<Segment
         }
     }
 
+    // m_graph[m_vertex_descriptor_map[u]].p = (u + v) / 2;
+    // m_vertex_descriptor_map[(u + v) / 2] = m_vertex_descriptor_map[u];
     boost::clear_vertex(m_vertex_descriptor_map[v], m_graph);
     // boost::remove_vertex(m_vertex_descriptor_map[v], m_graph);
     // m_vertex_descriptor_map.clear();
@@ -194,4 +287,30 @@ void ProcessGraph::contract_edge(const Segment &edge, std::unordered_set<Segment
     // {
     //     m_vertex_descriptor_map[m_graph[vertex].p] = vertex;
     // }
+}
+
+void ProcessGraph::contract_vertices(VertexDescriptor vertex1, VertexDescriptor vertex2)
+{
+    Vertex &vertex1_details = m_graph[vertex1];
+    Vertex &vertex2_details = m_graph[vertex2];
+
+    for (const auto &neighbor : boost::make_iterator_range(boost::adjacent_vertices(vertex2, m_graph)))
+    {
+        Vertex &collapsed = m_graph[neighbor];
+        if (collapsed.p == vertex1_details.p || m_added_edges.count({vertex1_details.p, collapsed.p}) > 0 ||
+            m_added_edges.count({collapsed.p, vertex1_details.p}) > 0)
+        {
+            continue;
+        }
+
+        assert(vertex1.p != collapsed.p);
+        assert(m_vertex_descriptor_map.count(collapsed.p) > 0);
+        assert(vertex1 != m_vertex_descriptor_map[collapsed.p]);
+        assert(vertex1 != vertex2);
+        assert(vertex1_details.p != collapsed.p);
+        boost::add_edge(vertex1, neighbor, distance(vertex1_details.p, collapsed.p), m_graph);
+        m_added_edges.insert({vertex1_details.p, collapsed.p});
+    }
+
+    boost::clear_vertex(vertex2, m_graph);
 }

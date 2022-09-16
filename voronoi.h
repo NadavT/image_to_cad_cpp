@@ -26,7 +26,6 @@ class VoronoiCalculator
   private:
     void calculate();
     bool check_mask(int x, int y);
-    static double distance_to_edge(cv::Point point, cv::Point edge_start, cv::Point edge_end);
     void draw_graph();
 
     point_type retrieve_point(const cell_type &cell);
