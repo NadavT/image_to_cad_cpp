@@ -1,5 +1,6 @@
 #include <opencv2/core/utils/logger.hpp>
 
+#include "irit_exporter.h"
 #include "preprocess.h"
 #include "process_graph.h"
 #include "types.h"
@@ -29,6 +30,8 @@ int main(int argc, char **argv)
                                               voronoi_calculator.get_vertex_descriptor_map(),
                                               voronoi_calculator.get_added_edges(), 2, 250, 14),
                    "Processing graph");
+    IritExporter irit_exporter(process_graph.get_graph());
+    TIMED_FUNCTION(irit_exporter.write("C:/technion/image_to_cad_cpp/results/scene.itd"), "Exporting to file");
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;

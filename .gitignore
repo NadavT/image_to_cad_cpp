@@ -2,3 +2,4 @@ build/
 .vscode/
 *.png
 *.ppm
+*.itd

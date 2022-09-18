@@ -185,7 +185,7 @@ void ProcessGraph::collapse_junctions(double junction_collapse_threshold)
             {
                 double length = 0;
                 std::vector<VertexDescriptor> route;
-                std::tie(length, route) = walk_to_next_junction(junction, neighbor);
+                std::tie(length, route, std::ignore) = walk_to_next_junction(junction, neighbor, m_graph);
                 if (length < junction_collapse_threshold)
                 {
                     for (const auto &vertex : route)
@@ -202,6 +202,7 @@ void ProcessGraph::collapse_junctions(double junction_collapse_threshold)
                     auto incident_segment = m_graph[junction].incident_segment;
                     m_graph[junction].distance_to_source =
                         distance_to_edge(m_graph[junction].p, incident_segment[0], incident_segment[1]);
+                    smooth_neighbors(junction, length);
                     reset = true;
                     break;
                 }
@@ -210,31 +211,44 @@ void ProcessGraph::collapse_junctions(double junction_collapse_threshold)
     }
 }
 
-std::tuple<double, std::vector<VertexDescriptor>> ProcessGraph::walk_to_next_junction(VertexDescriptor source,
-                                                                                      VertexDescriptor direction)
+std::tuple<double, std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> ProcessGraph::walk_to_next_junction(
+    VertexDescriptor source, VertexDescriptor direction, const Graph &graph)
 {
     std::vector<VertexDescriptor> route({source, direction});
-    double length = distance(m_graph[source].p, m_graph[direction].p);
+    std::vector<EdgeDescriptor> route_edges;
+    for (const auto &edge : boost::make_iterator_range(boost::out_edges(source, graph)))
+    {
+        if (boost::target(edge, graph) == direction)
+        {
+            route_edges.push_back(edge);
+            break;
+        }
+    }
+    double length = distance(graph[source].p, graph[direction].p);
     VertexDescriptor parent = direction;
     VertexDescriptor prev = source;
-    while (boost::degree(parent, m_graph) == 2)
+    while (boost::degree(parent, graph) == 2)
     {
-        route.push_back(parent);
         auto temp = parent;
-        auto edge = (boost::out_edges(parent, m_graph).first);
-        parent =
-            (boost::source(*edge, m_graph) == temp) ? boost::target(*edge, m_graph) : boost::source(*edge, m_graph);
+        auto edge = (boost::out_edges(parent, graph).first);
+        parent = (boost::source(*edge, graph) == temp) ? boost::target(*edge, graph) : boost::source(*edge, graph);
         if (parent == prev)
         {
             ++edge;
-            parent =
-                (boost::source(*edge, m_graph) == temp) ? boost::target(*edge, m_graph) : boost::source(*edge, m_graph);
+            parent = (boost::source(*edge, graph) == temp) ? boost::target(*edge, graph) : boost::source(*edge, graph);
         }
-        length += m_graph[*edge];
+        route.push_back(parent);
+        route_edges.push_back(*edge);
+        length += graph[*edge];
         prev = temp;
     }
 
-    return {length, route};
+    return {length, route, route_edges};
+}
+
+Graph &ProcessGraph::get_graph()
+{
+    return m_graph;
 }
 
 void ProcessGraph::contract_edge_small_edges_update(const Segment &edge, std::unordered_set<Segment> &small_edges)
@@ -313,4 +327,24 @@ void ProcessGraph::contract_vertices(VertexDescriptor vertex1, VertexDescriptor 
     }
 
     boost::clear_vertex(vertex2, m_graph);
+}
+
+void ProcessGraph::smooth_neighbors(VertexDescriptor vertex, double distance)
+{
+    bool changed = true;
+    while (changed)
+    {
+        changed = false;
+        for (const auto &edge : boost::make_iterator_range(boost::out_edges(vertex, m_graph)))
+        {
+            if (m_graph[edge] < distance)
+            {
+                VertexDescriptor neighbor = (boost::source(edge, m_graph) == vertex) ? boost::target(edge, m_graph)
+                                                                                     : boost::source(edge, m_graph);
+                contract_vertices(vertex, neighbor);
+                changed = true;
+                break;
+            }
+        }
+    }
 }
