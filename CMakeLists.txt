@@ -95,3 +95,4 @@ target_link_libraries(image_to_cad PRIVATE opencv_world argparse)
 target_include_directories(image_to_cad PRIVATE ${OPENCV_INCLUDE_DIRS} ${BOOST_INCLUDE_DIRS})
 
 install(TARGETS image_to_cad COMPONENT image_to_cad RUNTIME DESTINATION .)
+install(TARGETS opencv_world COMPONENT image_to_cad RUNTIME DESTINATION .)
