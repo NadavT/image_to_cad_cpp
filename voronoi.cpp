@@ -237,8 +237,8 @@ void VoronoiCalculator::draw_graph()
             edge = edge->next();
         } while (edge != cell.incident_edge());
     }
-    cv::imwrite("C:/technion/image_to_cad_cpp/results/voronoi.png", image_vor);
-    cv::imwrite("C:/technion/image_to_cad_cpp/results/voronoi2.png", image2);
+    cv::imwrite("voronoi.png", image_vor);
+    cv::imwrite("voronoi2.png", image2);
 
     cv::Mat image_graph(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
 
@@ -251,7 +251,7 @@ void VoronoiCalculator::draw_graph()
         cv::line(image_graph, u.p, v.p, cv::Scalar(0, 0, 255), line_width);
     }
 
-    cv::imwrite("C:/technion/image_to_cad_cpp/results/voronoi3.png", image_graph);
+    cv::imwrite("voronoi3.png", image_graph);
 }
 
 point_type VoronoiCalculator::retrieve_point(const cell_type &cell)

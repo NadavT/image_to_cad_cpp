@@ -27,7 +27,7 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
         cv::line(image_graph, u.p, v.p, cv::Scalar(0, 0, 255), 1);
     }
 
-    cv::imwrite("C:/technion/image_to_cad_cpp/results/voronoi4.png", image_graph);
+    cv::imwrite("voronoi4.png", image_graph);
 }
 
 void ProcessGraph::reduce(double reduction_proximity)
@@ -155,7 +155,7 @@ void ProcessGraph::remove_hanging()
             cv::line(image_graph, u.p, v.p, cv::Scalar(0, 0, 255), 1);
         }
 
-        cv::imwrite("C:/technion/image_to_cad_cpp/results/epoch" + std::to_string(i++) + ".png", image_graph);
+        cv::imwrite("epoch" + std::to_string(i++) + ".png", image_graph);
     }
 }
 

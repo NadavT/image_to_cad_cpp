@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-project(test_opencv)
+project(image_to_cad)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -73,15 +73,25 @@ FetchContent_GetProperties(boostorg)
 
 if(NOT boostorg_POPULATED)
     FetchContent_Populate(boostorg)
-    add_subdirectory(${boostorg_SOURCE_DIR} ${boostorg_BINARY_DIR})
+
+    # add_subdirectory(${boostorg_SOURCE_DIR} ${boostorg_BINARY_DIR})
 endif()
 
 collect_include_dirs(BOOST_INCLUDE_DIRS ${boostorg_SOURCE_DIR}/libs)
 
+# fetch latest argparse
+include(FetchContent)
+FetchContent_Declare(
+    argparse
+    GIT_REPOSITORY https://github.com/p-ranav/argparse.git
+    GIT_TAG v2.7
+    GIT_PROGRESS TRUE
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(argparse)
+
 add_executable(image_to_cad main.cpp preprocess.cpp voronoi.cpp process_graph.cpp irit_exporter.cpp)
-target_link_libraries(image_to_cad PRIVATE opencv_world)
+target_link_libraries(image_to_cad PRIVATE opencv_world argparse)
 target_include_directories(image_to_cad PRIVATE ${OPENCV_INCLUDE_DIRS} ${BOOST_INCLUDE_DIRS})
 
-add_executable(test_opencv test.cpp)
-target_link_libraries(test_opencv PRIVATE opencv_world)
-target_include_directories(test_opencv PRIVATE ${OPENCV_INCLUDE_DIRS} ${BOOST_INCLUDE_DIRS})
+install(TARGETS image_to_cad COMPONENT image_to_cad RUNTIME DESTINATION bin)

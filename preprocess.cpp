@@ -19,7 +19,7 @@ PreprocessImage::PreprocessImage(const Image &image, double scale_factor, double
     TIMED_INNER_FUNCTION(find_segments(), "finding segments");
 
     cv::drawContours(m_colored_image, m_segments, -1, {0xff, 0, 0}, 1);
-    cv::imwrite("C:/technion/image_to_cad_cpp/results/contours.png", m_colored_image);
+    cv::imwrite("contours.png", m_colored_image);
 }
 
 cv::Mat &PreprocessImage::get_colored_image()
