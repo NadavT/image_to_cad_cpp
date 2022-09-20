@@ -94,4 +94,4 @@ add_executable(image_to_cad main.cpp preprocess.cpp voronoi.cpp process_graph.cp
 target_link_libraries(image_to_cad PRIVATE opencv_world argparse)
 target_include_directories(image_to_cad PRIVATE ${OPENCV_INCLUDE_DIRS} ${BOOST_INCLUDE_DIRS})
 
-install(TARGETS image_to_cad COMPONENT image_to_cad RUNTIME DESTINATION bin)
+install(TARGETS image_to_cad COMPONENT image_to_cad RUNTIME DESTINATION .)
