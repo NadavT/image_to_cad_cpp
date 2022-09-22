@@ -44,7 +44,7 @@ cmake --install . --component image_to_cad
 
 ## Run
 
-Run `image_to_cad.exe` from `build\bin` dir.
+Run `image_to_cad.exe` from `install` dir.
 
 ### Arguments
 
