@@ -1,8 +1,8 @@
 include(cmake/utils.cmake)
 
-if(DEFINED Boost_DIR OR DEFINED $ENV{BOOST_ROOT} OR DEFINED $ENV{Boost_DIR})
+if(DEFINED Boost_DIR OR NOT $ENV{BOOST_ROOT} STREQUAL "" OR NOT $ENV{Boost_DIR} STREQUAL "")
     if(DEFINED Boost_DIR AND NOT ${Boost_DIR} STREQUAL "Boost_DIR-NOTFOUND")
-        cmake_path(IS_PREFIX CMAKE_BINARY_DIR ${OpenCV_DIR} is_fetched)
+        cmake_path(IS_PREFIX CMAKE_BINARY_DIR ${Boost_DIR} is_fetched)
     else()
         set(is_fetched FALSE)
     endif()
