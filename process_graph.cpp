@@ -317,7 +317,7 @@ void ProcessGraph::contract_vertices(VertexDescriptor vertex1, VertexDescriptor 
             continue;
         }
 
-        assert(vertex1.p != collapsed.p);
+        assert(vertex1_details.p != collapsed.p);
         assert(m_vertex_descriptor_map.count(collapsed.p) > 0);
         assert(vertex1 != m_vertex_descriptor_map[collapsed.p]);
         assert(vertex1 != vertex2);
