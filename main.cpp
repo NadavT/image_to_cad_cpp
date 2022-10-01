@@ -53,6 +53,10 @@ int main(int argc, char **argv)
         std::exit(1);
     }
 
+    if (!std::filesystem::exists(program.get<std::string>("--output_dir")))
+    {
+        std::filesystem::create_directory(program.get<std::string>("--output_dir"));
+    }
     std::filesystem::current_path(program.get<std::string>("--output_dir"));
 
     Image image = program.get<Image>("--input");
