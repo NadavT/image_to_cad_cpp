@@ -55,7 +55,7 @@ int main(int argc, char **argv)
 
     if (!std::filesystem::exists(program.get<std::string>("--output_dir")))
     {
-        std::filesystem::create_directory(program.get<std::string>("--output_dir"));
+        std::filesystem::create_directories(program.get<std::string>("--output_dir"));
     }
     std::filesystem::current_path(program.get<std::string>("--output_dir"));
 
