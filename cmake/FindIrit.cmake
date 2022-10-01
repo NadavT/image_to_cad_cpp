@@ -17,7 +17,8 @@ if(WIN32)
 			"$ENV{IRIT_PATH}/../lib64")
 
 		if(MSVC)
-			add_compile_definitions("-DWIN64 -D__WINNT__")
+			add_compile_definitions("WIN64")
+			add_compile_definitions("__WINNT__")
 		endif()
 	else()
 		find_library(Irit_LIBRARIES NAMES Irit HINTS
@@ -25,7 +26,8 @@ if(WIN32)
 			"$ENV{IRIT_PATH}/../lib")
 
 		if(MSVC)
-			add_compile_definitions("-DWIN32 -D__WINNT__")
+			add_compile_definitions("WIN32")
+			add_compile_definitions("__WINNT__")
 		endif()
 	endif()
 
