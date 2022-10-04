@@ -3,6 +3,7 @@
 
 #include <filesystem>
 
+#include "curves_generator.h"
 #include "irit_exporter.h"
 #include "preprocess.h"
 #include "process_graph.h"
@@ -39,7 +40,7 @@ int main(int argc, char **argv)
     program.add_argument("-it", "--islands_threshold").help("Islands threshold").default_value(4.0).scan<'g', double>();
     program.add_argument("-jt", "--junction_collapse_threshold")
         .help("Junction collapse threshold")
-        .default_value(14.0)
+        .default_value(20.0)
         .scan<'g', double>();
     program.add_argument("-b", "--border").help("Should add border").default_value(false).implicit_value(true);
 
@@ -79,6 +80,9 @@ int main(int argc, char **argv)
                    "Processing graph");
     IritExporter irit_exporter(process_graph.get_graph());
     TIMED_FUNCTION(irit_exporter.write("scene.itd"), "Exporting to file");
+
+    TIMED_FUNCTION(CurvesGenerator curves_generator(process_graph.get_graph()), "Generating curves");
+    TIMED_FUNCTION(curves_generator.write("curves.itd"), "Exporting curves to file");
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
