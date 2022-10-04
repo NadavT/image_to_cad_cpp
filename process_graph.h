@@ -7,7 +7,8 @@ class ProcessGraph
 {
   public:
     ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordered_set<Segment> &added_edges,
-                 double reduction_proximity, double hanging_threshold, double junction_collapse_threshold);
+                 double reduction_proximity, double hanging_threshold, double junction_collapse_threshold, int width,
+                 int height);
 
     static std::tuple<double, std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> walk_to_next_junction(
         VertexDescriptor source, VertexDescriptor direction, const Graph &graph);

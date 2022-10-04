@@ -4,7 +4,8 @@
 #include "utils.h"
 
 ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordered_set<Segment> &added_edges,
-                           double reduction_proximity, double hanging_threshold, double junction_collapse_threshold)
+                           double reduction_proximity, double hanging_threshold, double junction_collapse_threshold,
+                           int width, int height)
     : m_graph(graph)
     , m_vertex_descriptor_map(map)
     , m_added_edges(added_edges)
@@ -16,7 +17,7 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
     TIMED_INNER_FUNCTION(remove_hanging(), "Removing hanging");
     TIMED_INNER_FUNCTION(collapse_junctions(m_junction_collapse_threshold), "Collapsing junctions");
 
-    cv::Mat image_graph(2000, 4000, CV_8UC3, cv::Scalar(255, 255, 255));
+    cv::Mat image_graph(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
 
     auto edges = boost::edges(m_graph);
 

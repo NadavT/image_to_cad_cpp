@@ -5,7 +5,7 @@
 
 #include "utils.h"
 
-PreprocessImage::PreprocessImage(const Image &image, double scale_factor, double island_threshold)
+PreprocessImage::PreprocessImage(const Image &image, double scale_factor, double island_threshold, bool add_border)
     : m_grayscale_image(image)
     , m_scale_factor(scale_factor)
     , m_island_threshold(island_threshold)
@@ -13,7 +13,16 @@ PreprocessImage::PreprocessImage(const Image &image, double scale_factor, double
 {
     TIMED_INNER_FUNCTION(remove_islands(), "removing islands");
 
-    cv::resize(image, m_grayscale_image, cv::Size(image.cols * scale_factor, image.rows * scale_factor), 0, 0,
+    if (add_border)
+    {
+        cv::Mat bordered(image.rows + 4, image.cols + 4, image.type(), cv::Scalar(255));
+        cv::Rect offset_rect = cv::Rect(2, 2, image.cols, image.rows);
+        image.copyTo(bordered(offset_rect));
+        m_grayscale_image = bordered;
+    }
+
+    cv::resize(m_grayscale_image, m_grayscale_image,
+               cv::Size(m_grayscale_image.cols * scale_factor, m_grayscale_image.rows * scale_factor), 0, 0,
                cv::INTER_NEAREST_EXACT);
 
     TIMED_INNER_FUNCTION(find_segments(), "finding segments");

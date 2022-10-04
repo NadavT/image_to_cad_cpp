@@ -9,7 +9,7 @@
 class PreprocessImage
 {
   public:
-    PreprocessImage(const Image &image, double scale_factor, double island_threshold);
+    PreprocessImage(const Image &image, double scale_factor, double island_threshold, bool add_border);
 
     Image &get_colored_image();
     Image &get_grayscale_image();

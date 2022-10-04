@@ -41,6 +41,7 @@ int main(int argc, char **argv)
         .help("Junction collapse threshold")
         .default_value(14.0)
         .scan<'g', double>();
+    program.add_argument("-b", "--border").help("Should add border").default_value(false).implicit_value(true);
 
     try
     {
@@ -63,17 +64,19 @@ int main(int argc, char **argv)
     cv::imwrite("original.png", image);
 
     TIMED_FUNCTION(PreprocessImage preprocess_image(image, program.get<double>("--scale"),
-                                                    program.get<double>("--islands_threshold")),
+                                                    program.get<double>("--islands_threshold"),
+                                                    program.get<bool>("--border")),
                    "Preprocessing");
     TIMED_FUNCTION(
         VoronoiCalculator voronoi_calculator(preprocess_image.get_colored_image(), preprocess_image.get_segments()),
         "Calculating Voronoi");
-    TIMED_FUNCTION(
-        ProcessGraph process_graph(voronoi_calculator.get_graph(), voronoi_calculator.get_vertex_descriptor_map(),
-                                   voronoi_calculator.get_added_edges(), program.get<double>("--reduction_proximity"),
-                                   program.get<double>("--hanging_leaf_threshold"),
-                                   program.get<double>("--junction_collapse_threshold")),
-        "Processing graph");
+    TIMED_FUNCTION(ProcessGraph process_graph(
+                       voronoi_calculator.get_graph(), voronoi_calculator.get_vertex_descriptor_map(),
+                       voronoi_calculator.get_added_edges(), program.get<double>("--reduction_proximity"),
+                       program.get<double>("--hanging_leaf_threshold"),
+                       program.get<double>("--junction_collapse_threshold"), preprocess_image.get_colored_image().cols,
+                       preprocess_image.get_colored_image().rows),
+                   "Processing graph");
     IritExporter irit_exporter(process_graph.get_graph());
     TIMED_FUNCTION(irit_exporter.write("scene.itd"), "Exporting to file");
 
