@@ -3,29 +3,46 @@
 # Irit_INCLUDE_DIRS
 # Irit_LIBRARIES
 # Irit_FOUND
+
+if(WIN32)
+	set(IRIT_ROOT "C:\\irit\\irit\\ntbin")
+	set(IRIT64_ROOT "C:\\irit\\irit\\ntbin64")
+else()
+	set(IRIT_ROOT "/usr/local/irit/bin")
+	set(IRIT64_ROOT "/usr/local/irit/bin")
+endif()
+
+if(NOT $ENV{IRIT_ROOT} STREQUAL "")
+	set(IRIT_ROOT $ENV{IRIT_ROOT})
+endif()
+
+if(NOT $ENV{IRIT64_ROOT} STREQUAL "")
+	set(IRIT64_ROOT $ENV{IRIT64_ROOT})
+endif()
+
 if(WIN32)
 	find_path(Irit_INCLUDE_DIRS NAMES inc_irit/irit_sm.h HINTS
-		"$ENV{IRIT_PATH}/.."
-		"$ENV{IRIT_PATH}/../.."
-		"$ENV{IRIT_PATH64}/.."
-		"$ENV{IRIT_PATH64}/../.."
+		"${IRIT_ROOT}/.."
+		"${IRIT_ROOT}/../.."
+		"${IRIT64_ROOT}/.."
+		"${IRIT64_ROOT}/../.."
 	)
 
 	if(CMAKE_SIZEOF_VOID_P EQUAL 8)
 		if(CMAKE_BUILD_TYPE MATCHES Debug)
 			find_library(Irit_LIBRARIES NAMES IritD64 HINTS
-				"$ENV{IRIT_PATH64}/../lib64"
-				"$ENV{IRIT_PATH}/../lib64")
+				"${IRIT64_ROOT}/../lib64"
+				"${IRIT_ROOT}/../lib64")
 			find_file(irit_dynamic_lib_path NAMES IritD64.dll HINTS
-				"$ENV{IRIT_PATH64}"
-				"$ENV{IRIT_PATH}")
+				"${IRIT64_ROOT}"
+				"${IRIT_ROOT}")
 		else()
 			find_library(Irit_LIBRARIES NAMES Irit64 HINTS
-				"$ENV{IRIT_PATH64}/../lib64"
-				"$ENV{IRIT_PATH}/../lib64")
+				"${IRIT64_ROOT}/../lib64"
+				"${IRIT_ROOT}/../lib64")
 			find_file(irit_dynamic_lib_path NAMES Irit64.dll HINTS
-				"$ENV{IRIT_PATH64}"
-				"$ENV{IRIT_PATH}")
+				"${IRIT64_ROOT}"
+				"${IRIT_ROOT}")
 		endif()
 
 		if(MSVC)
@@ -35,18 +52,18 @@ if(WIN32)
 	else()
 		if(CMAKE_BUILD_TYPE MATCHES Debug)
 			find_library(Irit_LIBRARIES NAMES IritD HINTS
-				"$ENV{IRIT_PATH64}/../lib64"
-				"$ENV{IRIT_PATH}/../lib64")
+				"${IRIT64_ROOT}/../lib64"
+				"${IRIT_ROOT}/../lib64")
 			find_file(irit_dynamic_lib_path NAMES IritD.dll HINTS
-				"$ENV{IRIT_PATH64}"
-				"$ENV{IRIT_PATH}")
+				"${IRIT64_ROOT}"
+				"${IRIT_ROOT}")
 		else()
 			find_library(Irit_LIBRARIES NAMES Irit HINTS
-				"$ENV{IRIT_PATH64}/../lib64"
-				"$ENV{IRIT_PATH}/../lib64")
+				"${IRIT64_ROOT}/../lib64"
+				"${IRIT_ROOT}/../lib64")
 			find_file(irit_dynamic_lib_path NAMES Irit.dll HINTS
-				"$ENV{IRIT_PATH64}"
-				"$ENV{IRIT_PATH}")
+				"${IRIT64_ROOT}"
+				"${IRIT_ROOT}")
 		endif()
 
 		if(MSVC)
@@ -57,22 +74,22 @@ if(WIN32)
 
 else()
 	find_path(Irit_INCLUDE_DIRS NAMES inc_irit/irit_sm.h HINTS
-		"$ENV{IRIT_PATH}/..")
+		"${IRIT_ROOT}/..")
 
 	if(CMAKE_BUILD_TYPE MATCHES Debug)
 		find_library(Irit_LIBRARIES NAMES IritD HINTS
-			"$ENV{IRIT_PATH}/../lib"
-			"$ENV{IRIT_PATH}")
+			"${IRIT_ROOT}/../lib"
+			"${IRIT_ROOT}")
 		find_file(irit_dynamic_lib_path NAMES IritD.so HINTS
-			"$ENV{IRIT_PATH}"
-			"$ENV{IRIT_PATH}/../lib")
+			"${IRIT_ROOT}"
+			"${IRIT_ROOT}/../lib")
 	else()
 		find_library(Irit_LIBRARIES NAMES Irit HINTS
-			"$ENV{IRIT_PATH}/../lib"
-			"$ENV{IRIT_PATH}")
+			"${IRIT_ROOT}/../lib"
+			"${IRIT_ROOT}")
 		find_file(irit_dynamic_lib_path NAMES Irit.so HINTS
-			"$ENV{IRIT_PATH}"
-			"$ENV{IRIT_PATH}/../lib")
+			"${IRIT_ROOT}"
+			"${IRIT_ROOT}/../lib")
 	endif()
 endif()
 

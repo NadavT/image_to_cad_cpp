@@ -1,6 +1,6 @@
 include(cmake/utils.cmake)
 
-if(NOT DEFINED OpenCV_DIR AND NOT ENV{OpenCV_DIR} STREQUAL "")
+if(NOT DEFINED OpenCV_DIR AND NOT $ENV{OpenCV_DIR} STREQUAL "")
 	set(OpenCV_DIR $ENV{OpenCV_DIR})
 endif()
 
