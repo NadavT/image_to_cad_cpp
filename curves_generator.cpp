@@ -20,6 +20,7 @@ void CurvesGenerator::write(const std::string &filename)
         char *error;
         BzrCrvWriteToFile2(curve.get(), handler, 4, nullptr, &error);
     }
+    IPCloseStream(handler, TRUE);
 }
 
 void CurvesGenerator::generate_curves()
@@ -77,7 +78,7 @@ void CurvesGenerator::generate_curves()
         {
             curve->Points[1][i] = m_graph[route[i]].p.x;
             curve->Points[2][i] = m_graph[route[i]].p.y;
-            curve->Points[3][i] = 0; // m_graph[route[i]].distance_to_source;
+            curve->Points[3][i] = m_graph[route[i]].distance_to_source;
         }
         m_curves.push_back(std::move(curve));
 
