@@ -143,7 +143,6 @@ void ProcessGraph::remove_hanging()
             }
         }
         m_graph = new_graph;
-        reduce(4);
 
         cv::Mat image_graph(2000, 4000, CV_8UC3, cv::Scalar(255, 255, 255));
 
