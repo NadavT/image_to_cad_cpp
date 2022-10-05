@@ -2,6 +2,7 @@
 #
 # Irit_INCLUDE_DIRS
 # Irit_LIBRARIES
+# Irit_COMPILE_DEFINITIONS
 # Irit_FOUND
 
 if(WIN32)
@@ -19,6 +20,8 @@ endif()
 if(NOT $ENV{IRIT64_ROOT} STREQUAL "")
 	set(IRIT64_ROOT $ENV{IRIT64_ROOT})
 endif()
+
+set(Irit_COMPILE_DEFINITIONS "")
 
 if(WIN32)
 	find_path(Irit_INCLUDE_DIRS NAMES inc_irit/irit_sm.h HINTS
@@ -46,8 +49,7 @@ if(WIN32)
 		endif()
 
 		if(MSVC)
-			add_compile_definitions("WIN64")
-			add_compile_definitions("__WINNT__")
+			set(Irit_COMPILE_DEFINITIONS "WIN64" "__WINNT__")
 		endif()
 	else()
 		if(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -67,8 +69,7 @@ if(WIN32)
 		endif()
 
 		if(MSVC)
-			add_compile_definitions("WIN32")
-			add_compile_definitions("__WINNT__")
+			set(Irit_COMPILE_DEFINITIONS "WIN32" "__WINNT__")
 		endif()
 	endif()
 
