@@ -82,12 +82,10 @@ int main(int argc, char **argv)
                        program.get<double>("--junction_collapse_threshold"), preprocess_image.get_colored_image().cols,
                        preprocess_image.get_colored_image().rows),
                    "Processing graph");
-    IritExporter irit_exporter(process_graph.get_graph());
-    TIMED_FUNCTION(irit_exporter.write("scene.itd"), "Exporting to file");
-
     TIMED_FUNCTION(CurvesGenerator curves_generator(process_graph.get_graph(), program.get<int>("--curve_order")),
                    "Generating curves");
-    TIMED_FUNCTION(curves_generator.write("curves.itd"), "Exporting curves to file");
+    TIMED_FUNCTION(curves_generator.write_curves("curves.itd"), "Exporting curves to file");
+    TIMED_FUNCTION(curves_generator.write_offset_curves("offset_curves.itd"), "Exporting offset curves to file");
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
