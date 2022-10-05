@@ -31,7 +31,7 @@ int main(int argc, char **argv)
     program.add_argument("-s", "--scale").help("Scale factor").default_value(4.0).scan<'g', double>();
     program.add_argument("-r", "--reduction_proximity")
         .help("Reduction proximity")
-        .default_value(2.0)
+        .default_value(0.0)
         .scan<'g', double>();
     program.add_argument("-lt", "--hanging_leaf_threshold")
         .help("Hanging leaf threshold")
@@ -43,6 +43,10 @@ int main(int argc, char **argv)
         .default_value(20.0)
         .scan<'g', double>();
     program.add_argument("-b", "--border").help("Should add border").default_value(false).implicit_value(true);
+    program.add_argument("-co", "--curve_order")
+        .help("Assign the maximal order of the curve (B-Spline), use -1 to unlimited (Bezier curve)")
+        .default_value(4)
+        .scan<'i', int>();
 
     try
     {
@@ -81,7 +85,8 @@ int main(int argc, char **argv)
     IritExporter irit_exporter(process_graph.get_graph());
     TIMED_FUNCTION(irit_exporter.write("scene.itd"), "Exporting to file");
 
-    TIMED_FUNCTION(CurvesGenerator curves_generator(process_graph.get_graph()), "Generating curves");
+    TIMED_FUNCTION(CurvesGenerator curves_generator(process_graph.get_graph(), program.get<int>("--curve_order")),
+                   "Generating curves");
     TIMED_FUNCTION(curves_generator.write("curves.itd"), "Exporting curves to file");
 
     auto end = std::chrono::high_resolution_clock::now();

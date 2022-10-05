@@ -6,7 +6,7 @@
 class CurvesGenerator
 {
   public:
-    CurvesGenerator(Graph &graph);
+    CurvesGenerator(Graph &graph, int max_order);
 
     std::vector<Curve> get_curves();
 
@@ -18,6 +18,7 @@ class CurvesGenerator
   private:
     Graph &m_graph;
     std::vector<Curve> m_curves;
+    int m_max_order;
 };
 
 #endif /* CURVES_GENERATOR_H */

@@ -5,10 +5,15 @@
 
 #include <inc_irit/iritprsr.h>
 
-CurvesGenerator::CurvesGenerator(Graph &graph)
+CurvesGenerator::CurvesGenerator(Graph &graph, int max_order)
     : m_graph(graph)
     , m_curves()
+    , m_max_order(max_order)
 {
+    if (max_order == -1)
+    {
+        m_max_order = std::numeric_limits<int>::max();
+    }
     TIMED_INNER_FUNCTION(generate_curves(), "Generating curves");
 }
 
@@ -71,9 +76,11 @@ void CurvesGenerator::generate_curves()
             ProcessGraph::walk_to_next_junction(boost::source(edge, m_graph), boost::target(edge, m_graph), m_graph);
 
         // Add curve
-        Curve curve =
-            Curve(BspCrvNew(route.size(), (route.size() > 3) ? 4 : route.size(), CAGD_PT_E3_TYPE), CagdCrvFree);
-        BspKnotUniformOpen(route.size(), (route.size() > 3) ? 4 : route.size(), curve->KnotVector);
+        Curve curve = Curve(
+            BspCrvNew(route.size(), (route.size() >= m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E3_TYPE),
+            CagdCrvFree);
+        BspKnotUniformOpen(route.size(), (route.size() >= m_max_order - 1) ? m_max_order : route.size(),
+                           curve->KnotVector);
         for (int i = 0; i < route.size(); ++i)
         {
             curve->Points[1][i] = m_graph[route[i]].p.x;
