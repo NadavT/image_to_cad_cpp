@@ -14,9 +14,6 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
     , m_junction_collapse_threshold(junction_collapse_threshold)
 {
     TIMED_INNER_FUNCTION(reduce(m_reduction_proximity), "Reducing graph");
-    TIMED_INNER_FUNCTION(remove_hanging(), "Removing hanging");
-    TIMED_INNER_FUNCTION(collapse_junctions(m_junction_collapse_threshold), "Collapsing junctions");
-
     cv::Mat image_graph(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
 
     auto edges = boost::edges(m_graph);
@@ -28,7 +25,23 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
         cv::line(image_graph, u.p, v.p, cv::Scalar(0, 0, 255), 1);
     }
 
-    cv::imwrite("voronoi4.png", image_graph);
+    cv::imwrite("after_reduction.png", image_graph);
+
+    TIMED_INNER_FUNCTION(remove_hanging(), "Removing hanging");
+    TIMED_INNER_FUNCTION(collapse_junctions(m_junction_collapse_threshold), "Collapsing junctions");
+
+    image_graph = cv::Mat(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
+
+    edges = boost::edges(m_graph);
+
+    for (auto it = edges.first; it != edges.second; ++it)
+    {
+        const Vertex &u = m_graph[boost::source(*it, m_graph)];
+        const Vertex &v = m_graph[boost::target(*it, m_graph)];
+        cv::line(image_graph, u.p, v.p, cv::Scalar(0, 0, 255), 1);
+    }
+
+    cv::imwrite("final_graph_processing.png", image_graph);
 }
 
 void ProcessGraph::reduce(double reduction_proximity)
