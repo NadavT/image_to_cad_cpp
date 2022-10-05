@@ -228,6 +228,7 @@ std::tuple<double, std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> P
     double length = distance(graph[source].p, graph[direction].p);
     VertexDescriptor parent = direction;
     VertexDescriptor prev = source;
+    std::set<VertexDescriptor> visited({source, direction});
     while (boost::degree(parent, graph) == 2)
     {
         auto temp = parent;
@@ -238,9 +239,14 @@ std::tuple<double, std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> P
             ++edge;
             parent = (boost::source(*edge, graph) == temp) ? boost::target(*edge, graph) : boost::source(*edge, graph);
         }
+        if (visited.count(parent) > 0)
+        {
+            break;
+        }
         route.push_back(parent);
         route_edges.push_back(*edge);
         length += graph[*edge];
+        visited.insert(parent);
         prev = temp;
     }
 
