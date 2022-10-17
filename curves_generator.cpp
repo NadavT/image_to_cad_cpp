@@ -36,7 +36,7 @@ void CurvesGenerator::write_offset_curves(const std::string &filename)
     for (auto &curve : m_offset_curves)
     {
         char *error;
-        BzrCrvWriteToFile2(curve.get(), handler, 4, nullptr, &error);
+        BzrCrvWriteToFile2(std::get<0>(curve).get(), handler, 4, nullptr, &error);
     }
     IPCloseStream(handler, TRUE);
 }
@@ -44,14 +44,14 @@ void CurvesGenerator::write_offset_curves(const std::string &filename)
 void CurvesGenerator::generate_curves()
 {
     // Get candidates
-    std::vector<EdgeDescriptor> candidates;
+    std::vector<std::tuple<EdgeDescriptor, VertexDescriptor>> candidates;
     for (const auto &vertex : boost::make_iterator_range(boost::vertices(m_graph)))
     {
         if (boost::degree(vertex, m_graph) > 0 && boost::degree(vertex, m_graph) != 2)
         {
             for (const auto &edge : boost::make_iterator_range(boost::out_edges(vertex, m_graph)))
             {
-                candidates.push_back(edge);
+                candidates.push_back({edge, vertex});
             }
         }
     }
@@ -67,10 +67,13 @@ void CurvesGenerator::generate_curves()
     while (remaining.size() > 0)
     {
         EdgeDescriptor edge;
+        VertexDescriptor junction = -1;
+        VertexDescriptor junction2 = -1;
         // Take candidate if available
         if (candidates.size() > 0)
         {
-            edge = candidates.back();
+            edge = std::get<0>(candidates.back());
+            junction = std::get<1>(candidates.back());
             candidates.pop_back();
         }
         else
@@ -87,6 +90,10 @@ void CurvesGenerator::generate_curves()
         std::vector<EdgeDescriptor> route_edges;
         std::tie(std::ignore, route, route_edges) =
             ProcessGraph::walk_to_next_junction(boost::source(edge, m_graph), boost::target(edge, m_graph), m_graph);
+        if (route.back() != route.front())
+        {
+            junction2 = route.back();
+        }
 
         // Add curve
         Curve curve = Curve(
@@ -120,7 +127,8 @@ void CurvesGenerator::generate_curves()
             height_curve->Points[2][i] = m_graph[route[i]].p.y;
             height_curve->Points[3][i] = m_graph[route[i]].distance_to_source;
         }
-        m_curves.push_back({std::move(curve), std::move(width_curve), std::move(opposite_width_curve)});
+        m_curves.push_back(
+            {std::move(curve), std::move(width_curve), std::move(opposite_width_curve), junction, junction2});
         m_height_curves.push_back(std::move(height_curve));
 
         // Clean route_edges
@@ -144,13 +152,22 @@ void CurvesGenerator::generate_offset_curves()
         const Curve &curve = std::get<0>(item);
         const Curve &width_curve = std::get<1>(item);
         const Curve &opposite_width_curve = std::get<2>(item);
+        std::vector<VertexDescriptor> junctions;
+        if (std::get<3>(item) != -1)
+        {
+            junctions.push_back(std::get<3>(item));
+        }
+        if (std::get<4>(item) != -1)
+        {
+            junctions.push_back(std::get<4>(item));
+        }
         Curve offset_curve = Curve(SymbCrvVarOffset(curve.get(), width_curve.get(), FALSE), CagdCrvFree);
         Curve opposite_offset_curve =
             Curve(SymbCrvVarOffset(curve.get(), opposite_width_curve.get(), FALSE), CagdCrvFree);
         // Curve offset_curve = Curve(SymbCrvOffset(curve.get(), 1, FALSE), CagdCrvFree);
         // Curve opposite_offset_curve = Curve(SymbCrvOffset(curve.get(), -1, FALSE), CagdCrvFree);
-        m_offset_curves.push_back(std::move(offset_curve));
-        m_offset_curves.push_back(std::move(opposite_offset_curve));
+        m_offset_curves.push_back({std::move(offset_curve), junctions});
+        m_offset_curves.push_back({std::move(opposite_offset_curve), junctions});
         i++;
     }
 }
