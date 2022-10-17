@@ -224,7 +224,7 @@ void ProcessGraph::smooth_junctions(double smooth_distance)
     std::vector<VertexDescriptor> junctions = get_junctions();
     for (VertexDescriptor junction : junctions)
     {
-        double min_distance = 0;
+        double min_distance = std::numeric_limits<double>::max();
         for (const auto &neighbor : boost::make_iterator_range(boost::adjacent_vertices(junction, m_graph)))
         {
             double junction_distance;
