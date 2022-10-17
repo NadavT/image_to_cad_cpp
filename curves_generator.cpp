@@ -90,24 +90,24 @@ void CurvesGenerator::generate_curves()
 
         // Add curve
         Curve curve = Curve(
-            BspCrvNew(route.size(), (route.size() >= m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E2_TYPE),
+            BspCrvNew(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E2_TYPE),
             CagdCrvFree);
         Curve width_curve = Curve(
-            BspCrvNew(route.size(), (route.size() >= m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E1_TYPE),
+            BspCrvNew(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E1_TYPE),
             CagdCrvFree);
         Curve opposite_width_curve = Curve(
-            BspCrvNew(route.size(), (route.size() >= m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E1_TYPE),
+            BspCrvNew(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E1_TYPE),
             CagdCrvFree);
         Curve height_curve = Curve(
-            BspCrvNew(route.size(), (route.size() >= m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E3_TYPE),
+            BspCrvNew(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E3_TYPE),
             CagdCrvFree);
-        BspKnotUniformOpen(route.size(), (route.size() >= m_max_order - 1) ? m_max_order : route.size(),
+        BspKnotUniformOpen(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(),
                            curve->KnotVector);
-        BspKnotUniformOpen(route.size(), (route.size() >= m_max_order - 1) ? m_max_order : route.size(),
+        BspKnotUniformOpen(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(),
                            width_curve->KnotVector);
-        BspKnotUniformOpen(route.size(), (route.size() >= m_max_order - 1) ? m_max_order : route.size(),
+        BspKnotUniformOpen(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(),
                            opposite_width_curve->KnotVector);
-        BspKnotUniformOpen(route.size(), (route.size() >= m_max_order - 1) ? m_max_order : route.size(),
+        BspKnotUniformOpen(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(),
                            height_curve->KnotVector);
         for (int i = 0; i < route.size(); ++i)
         {

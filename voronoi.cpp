@@ -160,6 +160,8 @@ void VoronoiCalculator::draw_graph()
                             else
                             {
                                 u_desc = m_vertex_descriptor_map[start_p];
+                                m_graph[u_desc].distance_to_source =
+                                    std::max(m_graph[u_desc].distance_to_source, u.distance_to_source);
                             }
                             if (m_vertex_descriptor_map.count(end_p) == 0)
                             {
@@ -169,6 +171,8 @@ void VoronoiCalculator::draw_graph()
                             else
                             {
                                 v_desc = m_vertex_descriptor_map[end_p];
+                                m_graph[v_desc].distance_to_source =
+                                    std::max(m_graph[v_desc].distance_to_source, v.distance_to_source);
                             }
                             assert(u_desc != v_desc);
                             boost::add_edge(u_desc, v_desc, distance(start_p, end_p), m_graph);
@@ -195,6 +199,8 @@ void VoronoiCalculator::draw_graph()
                             else
                             {
                                 u_desc = m_vertex_descriptor_map[start_p];
+                                m_graph[u_desc].distance_to_source =
+                                    std::max(m_graph[u_desc].distance_to_source, u.distance_to_source);
                             }
                             if (m_vertex_descriptor_map.count(end_p) == 0)
                             {
@@ -204,6 +210,8 @@ void VoronoiCalculator::draw_graph()
                             else
                             {
                                 v_desc = m_vertex_descriptor_map[end_p];
+                                m_graph[v_desc].distance_to_source =
+                                    std::max(m_graph[v_desc].distance_to_source, v.distance_to_source);
                             }
                             assert(u_desc != v_desc);
                             boost::add_edge(u_desc, v_desc, distance(start_p, end_p), m_graph);

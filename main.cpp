@@ -38,9 +38,13 @@ int main(int argc, char **argv)
         .default_value(250.0)
         .scan<'g', double>();
     program.add_argument("-it", "--islands_threshold").help("Islands threshold").default_value(4.0).scan<'g', double>();
-    program.add_argument("-jt", "--junction_collapse_threshold")
+    program.add_argument("-jct", "--junction_collapse_threshold")
         .help("Junction collapse threshold")
         .default_value(20.0)
+        .scan<'g', double>();
+    program.add_argument("-jst", "--junction_smooth_threshold")
+        .help("Junction smooth threshold")
+        .default_value(10.0)
         .scan<'g', double>();
     program.add_argument("-b", "--border").help("Should add border").default_value(false).implicit_value(true);
     program.add_argument("-co", "--curve_order")
@@ -79,7 +83,8 @@ int main(int argc, char **argv)
                        voronoi_calculator.get_graph(), voronoi_calculator.get_vertex_descriptor_map(),
                        voronoi_calculator.get_added_edges(), program.get<double>("--reduction_proximity"),
                        program.get<double>("--hanging_leaf_threshold"),
-                       program.get<double>("--junction_collapse_threshold"), preprocess_image.get_colored_image().cols,
+                       program.get<double>("--junction_collapse_threshold"),
+                       program.get<double>("--junction_smooth_threshold"), preprocess_image.get_colored_image().cols,
                        preprocess_image.get_colored_image().rows),
                    "Processing graph");
     TIMED_FUNCTION(CurvesGenerator curves_generator(process_graph.get_graph(), program.get<int>("--curve_order")),
