@@ -7,6 +7,7 @@
 #include <boost/graph/graph_traits.hpp>
 #include <boost/polygon/voronoi.hpp>
 #include <inc_irit/cagd_lib.h>
+#include <inc_irit/triv_lib.h>
 #include <opencv2/opencv.hpp>
 #include <vector>
 
@@ -52,5 +53,6 @@ template <> struct std::hash<Segment>
 using Curve = std::unique_ptr<CagdCrvStruct, decltype(&CagdCrvFree)>;
 using IritPoint = std::unique_ptr<CagdPtStruct, decltype(&CagdPtFree)>;
 using IritSurface = std::unique_ptr<CagdSrfStruct, decltype(&CagdSrfFree)>;
+using IritTV = std::unique_ptr<TrivTVStruct, decltype(&TrivTVFree)>;
 
 #endif /* TYPES_H */

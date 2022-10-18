@@ -51,6 +51,7 @@ int main(int argc, char **argv)
         .help("Assign the maximal order of the curve (B-Spline), use -1 to unlimited (Bezier curve)")
         .default_value(4)
         .scan<'i', int>();
+    program.add_argument("-ex", "--extrusion").help("Extrusion amount").default_value(10.0).scan<'g', double>();
 
     try
     {
@@ -87,11 +88,13 @@ int main(int argc, char **argv)
                        program.get<double>("--junction_smooth_threshold"), preprocess_image.get_colored_image().cols,
                        preprocess_image.get_colored_image().rows),
                    "Processing graph");
-    TIMED_FUNCTION(CurvesGenerator curves_generator(process_graph.get_graph(), program.get<int>("--curve_order")),
+    TIMED_FUNCTION(CurvesGenerator curves_generator(process_graph.get_graph(), program.get<int>("--curve_order"),
+                                                    program.get<double>("--extrusion")),
                    "Generating curves");
     TIMED_FUNCTION(curves_generator.write_curves("curves.itd"), "Exporting curves to file");
     TIMED_FUNCTION(curves_generator.write_offset_curves("offset_curves.itd"), "Exporting offset curves to file");
     TIMED_FUNCTION(curves_generator.write_surfaces("surfaces.itd"), "Exporting surfaces to file");
+    TIMED_FUNCTION(curves_generator.write_extrusions("extrusions.itd"), "Exporting extrusions to file");
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;

@@ -5,11 +5,12 @@
 
 #include <inc_irit/iritprsr.h>
 
-CurvesGenerator::CurvesGenerator(Graph &graph, int max_order)
+CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, double extrusion_amount)
     : m_graph(graph)
     , m_curves()
     , m_max_order(max_order)
     , m_offset_curves()
+    , m_extrusion_amount(extrusion_amount)
 {
     if (max_order == -1)
     {
@@ -19,6 +20,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order)
     TIMED_INNER_FUNCTION(generate_offset_curves(), "Generating offset curves");
     TIMED_INNER_FUNCTION(generate_surfaces_from_junctions(), "Generating surfaces from junctions");
     TIMED_INNER_FUNCTION(generate_surfaces_from_curves(), "Generating surfaces from curves");
+    TIMED_INNER_FUNCTION(extrude_surfaces(), "Extruding surfaces");
 }
 
 void CurvesGenerator::write_curves(const std::string &filename)
@@ -50,6 +52,16 @@ void CurvesGenerator::write_surfaces(const std::string &filename)
     {
         char *error;
         BzrSrfWriteToFile2(surface.get(), handler, 4, nullptr, &error);
+    }
+    IPCloseStream(handler, TRUE);
+}
+void CurvesGenerator::write_extrusions(const std::string &filename)
+{
+    int handler = IPOpenDataFile(filename.c_str(), FALSE, TRUE);
+    for (auto &extrusion : m_extrusions)
+    {
+        char *error;
+        TrivTVWriteToFile2(extrusion.get(), handler, 4, nullptr, &error);
     }
     IPCloseStream(handler, TRUE);
 }
@@ -327,5 +339,17 @@ void CurvesGenerator::generate_surfaces_from_curves()
             IritSurface(CagdRuledSrf(sliced_offset_curve1->Pnext, sliced_offset_curve2->Pnext, 2, 2), CagdSrfFree));
         CagdCrvFreeList(sliced_offset_curve1);
         CagdCrvFreeList(sliced_offset_curve2);
+    }
+}
+
+void CurvesGenerator::extrude_surfaces()
+{
+    CagdVecStruct extrusion_vector = {0};
+    extrusion_vector.Vec[0] = 0;
+    extrusion_vector.Vec[1] = 0;
+    extrusion_vector.Vec[2] = m_extrusion_amount;
+    for (auto &surface : m_surfaces)
+    {
+        m_extrusions.push_back(IritTV(TrivExtrudeTV(surface.get(), &extrusion_vector), TrivTVFree));
     }
 }
