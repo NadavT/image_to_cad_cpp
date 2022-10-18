@@ -17,7 +17,8 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order)
     }
     TIMED_INNER_FUNCTION(generate_curves(), "Generating curves");
     TIMED_INNER_FUNCTION(generate_offset_curves(), "Generating offset curves");
-    TIMED_INNER_FUNCTION(generate_surface_from_junctions(), "Generating surfaces");
+    TIMED_INNER_FUNCTION(generate_surfaces_from_junctions(), "Generating surfaces from junctions");
+    TIMED_INNER_FUNCTION(generate_surfaces_from_curves(), "Generating surfaces from curves");
 }
 
 void CurvesGenerator::write_curves(const std::string &filename)
@@ -185,6 +186,8 @@ void CurvesGenerator::generate_offset_curves()
         Curve offset_curve = Curve(SymbCrvVarOffset(curve.get(), width_curve.get(), FALSE), CagdCrvFree);
         Curve opposite_offset_curve =
             Curve(SymbCrvVarOffset(curve.get(), opposite_width_curve.get(), FALSE), CagdCrvFree);
+        // m_surfaces.push_back(
+        //     IritSurface(CagdRuledSrf(offset_curve.get(), opposite_offset_curve.get(), 2, 2), CagdSrfFree));
         // Curve offset_curve = Curve(SymbCrvOffset(curve.get(), 1, FALSE), CagdCrvFree);
         // Curve opposite_offset_curve = Curve(SymbCrvOffset(curve.get(), -1, FALSE), CagdCrvFree);
         m_offset_curves.push_back({std::move(offset_curve), junctions});
@@ -201,7 +204,7 @@ void CurvesGenerator::generate_offset_curves()
     std::cout << "Finished " << i << " curves out of " << m_curves.size() << std::endl;
 }
 
-void CurvesGenerator::generate_surface_from_junctions()
+void CurvesGenerator::generate_surfaces_from_junctions()
 {
     for (const auto &junction_matcher : m_junction_to_curves)
     {
@@ -237,5 +240,92 @@ void CurvesGenerator::generate_surface_from_junctions()
                 CagdBilinearSrf(points[0].get(), points[1].get(), points[3].get(), points[2].get(), CAGD_PT_E2_TYPE),
                 CagdSrfFree));
         }
+    }
+}
+
+void CurvesGenerator::generate_surfaces_from_curves()
+{
+    for (const auto &curve_info : m_curves)
+    {
+        const Curve &curve = std::get<0>(curve_info);
+        VertexDescriptor junction1 = std::get<3>(curve_info);
+        VertexDescriptor junction2 = std::get<4>(curve_info);
+        assert(m_curve_to_offset_curves.count(curve.get()) > 0);
+        assert(m_curve_to_offset_curves[curve.get()].size() == 2);
+        CagdCrvStruct *offset_curve1 = m_curve_to_offset_curves[curve.get()][0];
+        CagdCrvStruct *offset_curve2 = m_curve_to_offset_curves[curve.get()][1];
+        CagdRType intersection1_junction1 = 0;
+        CagdRType intersection2_junction1 = 1;
+        CagdRType intersection1_junction2 = 0;
+        CagdRType intersection2_junction2 = 1;
+        if (junction1 != -1)
+        {
+            for (auto itr = m_junction_to_curves[junction1].cbegin(); itr != m_junction_to_curves[junction1].cend();
+                 ++itr)
+            {
+                CagdCrvStruct *match_curve = *itr;
+                if (match_curve == offset_curve1 || match_curve == offset_curve2)
+                {
+                    continue;
+                }
+                CagdPtStruct *intersections1 = CagdCrvCrvInter(offset_curve1, match_curve, 0.00001);
+                CagdPtStruct *intersections2 = CagdCrvCrvInter(offset_curve2, match_curve, 0.00001);
+                for (CagdPtStruct *t = intersections1; t != nullptr; t = t->Pnext)
+                {
+                    if (t->Pt[0] > 0 && t->Pt[0] < 1)
+                    {
+                        assert(intersection1_junction1 == 0 || intersection1_junction1 == 1);
+                        intersection1_junction1 = t->Pt[0];
+                    }
+                }
+                for (CagdPtStruct *t = intersections2; t != nullptr; t = t->Pnext)
+                {
+                    if (t->Pt[0] > 0 && t->Pt[0] < 1)
+                    {
+                        assert(intersection2_junction1 == 0 || intersection2_junction1 == 1);
+                        intersection2_junction1 = t->Pt[0];
+                    }
+                }
+            }
+        }
+        if (junction2 != -1)
+        {
+            for (auto itr = m_junction_to_curves[junction2].cbegin(); itr != m_junction_to_curves[junction2].cend();
+                 ++itr)
+            {
+                CagdCrvStruct *match_curve = *itr;
+                if (match_curve == offset_curve1 || match_curve == offset_curve2)
+                {
+                    continue;
+                }
+                CagdPtStruct *intersections1 = CagdCrvCrvInter(offset_curve1, match_curve, 0.00001);
+                CagdPtStruct *intersections2 = CagdCrvCrvInter(offset_curve2, match_curve, 0.00001);
+                for (CagdPtStruct *t = intersections1; t != nullptr; t = t->Pnext)
+                {
+                    if (t->Pt[0] > 0 && t->Pt[0] < 1)
+                    {
+                        assert(intersection1_junction2 == 0 || intersection1_junction2 == 1);
+                        intersection1_junction2 = t->Pt[0];
+                    }
+                }
+                for (CagdPtStruct *t = intersections2; t != nullptr; t = t->Pnext)
+                {
+                    if (t->Pt[0] > 0 && t->Pt[0] < 1)
+                    {
+                        assert(intersection2_junction2 == 0 || intersection2_junction2 == 1);
+                        intersection2_junction2 = t->Pt[0];
+                    }
+                }
+            }
+        }
+        int proximity;
+        CagdRType params1[2] = {intersection1_junction1, intersection1_junction2};
+        CagdRType params2[2] = {intersection2_junction1, intersection2_junction2};
+        CagdCrvStruct *sliced_offset_curve1 = CagdCrvSubdivAtParams3(offset_curve1, params1, 2, 0, FALSE, &proximity);
+        CagdCrvStruct *sliced_offset_curve2 = CagdCrvSubdivAtParams3(offset_curve2, params2, 2, 0, FALSE, &proximity);
+        m_surfaces.push_back(
+            IritSurface(CagdRuledSrf(sliced_offset_curve1->Pnext, sliced_offset_curve2->Pnext, 2, 2), CagdSrfFree));
+        CagdCrvFreeList(sliced_offset_curve1);
+        CagdCrvFreeList(sliced_offset_curve2);
     }
 }

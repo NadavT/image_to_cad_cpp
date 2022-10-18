@@ -20,7 +20,8 @@ class CurvesGenerator
   private:
     void generate_curves();
     void generate_offset_curves();
-    void generate_surface_from_junctions();
+    void generate_surfaces_from_junctions();
+    void generate_surfaces_from_curves();
 
   private:
     Graph &m_graph;
