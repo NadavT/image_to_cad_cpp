@@ -17,6 +17,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order)
     }
     TIMED_INNER_FUNCTION(generate_curves(), "Generating curves");
     TIMED_INNER_FUNCTION(generate_offset_curves(), "Generating offset curves");
+    TIMED_INNER_FUNCTION(generate_surface_from_junctions(), "Generating surfaces");
 }
 
 void CurvesGenerator::write_curves(const std::string &filename)
@@ -37,6 +38,17 @@ void CurvesGenerator::write_offset_curves(const std::string &filename)
     {
         char *error;
         BzrCrvWriteToFile2(std::get<0>(curve).get(), handler, 4, nullptr, &error);
+    }
+    IPCloseStream(handler, TRUE);
+}
+
+void CurvesGenerator::write_surfaces(const std::string &filename)
+{
+    int handler = IPOpenDataFile(filename.c_str(), FALSE, TRUE);
+    for (auto &surface : m_surfaces)
+    {
+        char *error;
+        BzrSrfWriteToFile2(surface.get(), handler, 4, nullptr, &error);
     }
     IPCloseStream(handler, TRUE);
 }
@@ -136,6 +148,7 @@ void CurvesGenerator::generate_curves()
         {
             remaining.erase(edge);
         }
+        // CagdCrvCrvInter
     }
 }
 
@@ -156,10 +169,18 @@ void CurvesGenerator::generate_offset_curves()
         if (std::get<3>(item) != -1)
         {
             junctions.push_back(std::get<3>(item));
+            if (m_junction_to_curves.count(std::get<3>(item)) == 0)
+            {
+                m_junction_to_curves[std::get<3>(item)] = std::vector<CagdCrvStruct *>();
+            }
         }
         if (std::get<4>(item) != -1)
         {
             junctions.push_back(std::get<4>(item));
+            if (m_junction_to_curves.count(std::get<4>(item)) == 0)
+            {
+                m_junction_to_curves[std::get<4>(item)] = std::vector<CagdCrvStruct *>();
+            }
         }
         Curve offset_curve = Curve(SymbCrvVarOffset(curve.get(), width_curve.get(), FALSE), CagdCrvFree);
         Curve opposite_offset_curve =
@@ -168,6 +189,53 @@ void CurvesGenerator::generate_offset_curves()
         // Curve opposite_offset_curve = Curve(SymbCrvOffset(curve.get(), -1, FALSE), CagdCrvFree);
         m_offset_curves.push_back({std::move(offset_curve), junctions});
         m_offset_curves.push_back({std::move(opposite_offset_curve), junctions});
+        m_curve_to_offset_curves[curve.get()] = {std::get<0>(m_offset_curves.back()).get(),
+                                                 std::get<0>(*std::prev(m_offset_curves.end(), 2)).get()};
+        for (const auto &junction : junctions)
+        {
+            m_junction_to_curves[junction].push_back(std::get<0>(m_offset_curves.back()).get());
+            m_junction_to_curves[junction].push_back(std::get<0>(*std::prev(m_offset_curves.end(), 2)).get());
+        }
         i++;
+    }
+    std::cout << "Finished " << i << " curves out of " << m_curves.size() << std::endl;
+}
+
+void CurvesGenerator::generate_surface_from_junctions()
+{
+    for (const auto &junction_matcher : m_junction_to_curves)
+    {
+        std::vector<IritPoint> points;
+        for (auto itr = junction_matcher.second.cbegin(); itr != junction_matcher.second.cend(); ++itr)
+        {
+            CagdCrvStruct *curve1 = *itr;
+            auto itr2 = itr;
+            for (itr2 = ++itr2; itr2 != junction_matcher.second.cend(); ++itr2)
+            {
+                CagdCrvStruct *curve2 = *itr2;
+                CagdPtStruct *intersections = CagdCrvCrvInter(curve1, curve2, 0.00001);
+                for (CagdPtStruct *t = intersections; t != nullptr; t = t->Pnext)
+                {
+                    if (t->Pt[0] > 0 && t->Pt[0] < 1)
+                    {
+                        CagdPtStruct *point = CagdPtNew();
+                        CAGD_CRV_EVAL_E2(curve1, t->Pt[0], &point->Pt[0]);
+                        points.push_back(IritPoint(point, CagdPtFree));
+                    }
+                }
+            }
+        }
+        if (points.size() == 3)
+        {
+            m_surfaces.push_back(IritSurface(
+                CagdBilinearSrf(points[0].get(), points[1].get(), points[2].get(), points[1].get(), CAGD_PT_E2_TYPE),
+                CagdSrfFree));
+        }
+        else if (points.size() == 4)
+        {
+            m_surfaces.push_back(IritSurface(
+                CagdBilinearSrf(points[0].get(), points[1].get(), points[3].get(), points[2].get(), CAGD_PT_E2_TYPE),
+                CagdSrfFree));
+        }
     }
 }

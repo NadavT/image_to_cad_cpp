@@ -91,6 +91,7 @@ int main(int argc, char **argv)
                    "Generating curves");
     TIMED_FUNCTION(curves_generator.write_curves("curves.itd"), "Exporting curves to file");
     TIMED_FUNCTION(curves_generator.write_offset_curves("offset_curves.itd"), "Exporting offset curves to file");
+    TIMED_FUNCTION(curves_generator.write_surfaces("surfaces.itd"), "Exporting surfaces to file");
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;

@@ -50,5 +50,7 @@ template <> struct std::hash<Segment>
 };
 
 using Curve = std::unique_ptr<CagdCrvStruct, decltype(&CagdCrvFree)>;
+using IritPoint = std::unique_ptr<CagdPtStruct, decltype(&CagdPtFree)>;
+using IritSurface = std::unique_ptr<CagdSrfStruct, decltype(&CagdSrfFree)>;
 
 #endif /* TYPES_H */
