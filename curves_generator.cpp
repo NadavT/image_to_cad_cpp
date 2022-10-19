@@ -267,8 +267,8 @@ void CurvesGenerator::generate_surfaces_from_curves()
         CagdCrvStruct *offset_curve1 = m_curve_to_offset_curves[curve.get()][0];
         CagdCrvStruct *offset_curve2 = m_curve_to_offset_curves[curve.get()][1];
         CagdRType intersection1_junction1 = 0;
-        CagdRType intersection2_junction1 = 1;
-        CagdRType intersection1_junction2 = 0;
+        CagdRType intersection2_junction1 = 0;
+        CagdRType intersection1_junction2 = 1;
         CagdRType intersection2_junction2 = 1;
         if (junction1 != -1)
         {
@@ -335,8 +335,11 @@ void CurvesGenerator::generate_surfaces_from_curves()
         CagdRType params2[2] = {intersection2_junction1, intersection2_junction2};
         CagdCrvStruct *sliced_offset_curve1 = CagdCrvSubdivAtParams3(offset_curve1, params1, 2, 0, FALSE, &proximity);
         CagdCrvStruct *sliced_offset_curve2 = CagdCrvSubdivAtParams3(offset_curve2, params2, 2, 0, FALSE, &proximity);
-        m_surfaces.push_back(
-            IritSurface(CagdRuledSrf(sliced_offset_curve1->Pnext, sliced_offset_curve2->Pnext, 2, 2), CagdSrfFree));
+        CagdCrvStruct *wanted_curve1 =
+            (intersection1_junction1 > 0) ? sliced_offset_curve1->Pnext : sliced_offset_curve1;
+        CagdCrvStruct *wanted_curve2 =
+            (intersection2_junction1 > 0) ? sliced_offset_curve2->Pnext : sliced_offset_curve2;
+        m_surfaces.push_back(IritSurface(CagdRuledSrf(wanted_curve1, wanted_curve2, 2, 2), CagdSrfFree));
         CagdCrvFreeList(sliced_offset_curve1);
         CagdCrvFreeList(sliced_offset_curve2);
     }
