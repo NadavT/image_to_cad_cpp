@@ -113,8 +113,8 @@ void CurvesGenerator::generate_curves()
         remaining.erase(edge);
         std::vector<VertexDescriptor> route;
         std::vector<EdgeDescriptor> route_edges;
-        std::tie(std::ignore, route, route_edges) =
-            ProcessGraph::walk_to_next_junction(boost::source(edge, m_graph), boost::target(edge, m_graph), m_graph);
+        std::tie(std::ignore, route, route_edges) = ProcessGraph::walk_to_next_junction(
+            boost::source(edge, m_graph), boost::target(edge, m_graph), m_graph, true);
         if (route.back() != route.front())
         {
             junction2 = route.back();
@@ -161,7 +161,6 @@ void CurvesGenerator::generate_curves()
         {
             remaining.erase(edge);
         }
-        // CagdCrvCrvInter
     }
 }
 
@@ -198,8 +197,6 @@ void CurvesGenerator::generate_offset_curves()
         Curve offset_curve = Curve(SymbCrvVarOffset(curve.get(), width_curve.get(), FALSE), CagdCrvFree);
         Curve opposite_offset_curve =
             Curve(SymbCrvVarOffset(curve.get(), opposite_width_curve.get(), FALSE), CagdCrvFree);
-        // m_surfaces.push_back(
-        //     IritSurface(CagdRuledSrf(offset_curve.get(), opposite_offset_curve.get(), 2, 2), CagdSrfFree));
         // Curve offset_curve = Curve(SymbCrvOffset(curve.get(), 1, FALSE), CagdCrvFree);
         // Curve opposite_offset_curve = Curve(SymbCrvOffset(curve.get(), -1, FALSE), CagdCrvFree);
         m_offset_curves.push_back({std::move(offset_curve), junctions});

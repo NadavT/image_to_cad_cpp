@@ -11,7 +11,7 @@ class ProcessGraph
                  double junction_smooth_threshold, int width, int height);
 
     static std::tuple<double, std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> walk_to_next_junction(
-        VertexDescriptor source, VertexDescriptor direction, const Graph &graph);
+        VertexDescriptor source, VertexDescriptor direction, const Graph &graph, bool get_cycle = false);
 
     Graph &get_graph();
 

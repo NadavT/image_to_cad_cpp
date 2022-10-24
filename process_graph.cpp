@@ -254,7 +254,7 @@ std::vector<VertexDescriptor> ProcessGraph::get_junctions()
 }
 
 std::tuple<double, std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> ProcessGraph::walk_to_next_junction(
-    VertexDescriptor source, VertexDescriptor direction, const Graph &graph)
+    VertexDescriptor source, VertexDescriptor direction, const Graph &graph, bool get_cycle)
 {
     std::vector<VertexDescriptor> route({source, direction});
     std::vector<EdgeDescriptor> route_edges;
@@ -282,6 +282,12 @@ std::tuple<double, std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> P
         }
         if (visited.count(parent) > 0)
         {
+            if (get_cycle)
+            {
+                route.push_back(parent);
+                route_edges.push_back(*edge);
+                length += graph[*edge];
+            }
             break;
         }
         route.push_back(parent);
