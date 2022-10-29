@@ -173,7 +173,7 @@ void CurvesGenerator::generate_offset_curves()
         {
             std::cout << "\x1b[A";
         }
-        std::cout << "Finished " << i << " curves out of " << m_curves.size() << std::endl;
+        std::cout << "\t\tFinished " << i << " curves out of " << m_curves.size() << std::endl;
         const Curve &curve = std::get<0>(item);
         const Curve &width_curve = std::get<1>(item);
         const Curve &opposite_width_curve = std::get<2>(item);
@@ -210,7 +210,11 @@ void CurvesGenerator::generate_offset_curves()
         }
         i++;
     }
-    std::cout << "Finished " << i << " curves out of " << m_curves.size() << std::endl;
+    if (i != 0)
+    {
+        std::cout << "\x1b[A";
+    }
+    std::cout << "\t\tFinished " << i << " curves out of " << m_curves.size() << std::endl;
 }
 
 void CurvesGenerator::generate_surfaces_from_junctions()
@@ -246,11 +250,11 @@ void CurvesGenerator::generate_surfaces_from_junctions()
         }
         else if (points.size() == 4)
         {
-            std::cout << "4 points:" << std::endl;
-            std::cout << "(" << points[0]->Pt[0] << ", " << points[0]->Pt[1] << ")" << std::endl;
-            std::cout << "(" << points[1]->Pt[0] << ", " << points[1]->Pt[1] << ")" << std::endl;
-            std::cout << "(" << points[2]->Pt[0] << ", " << points[2]->Pt[1] << ")" << std::endl;
-            std::cout << "(" << points[3]->Pt[0] << ", " << points[3]->Pt[1] << ")" << std::endl;
+            // std::cout << "4 points:" << std::endl;
+            // std::cout << "(" << points[0]->Pt[0] << ", " << points[0]->Pt[1] << ")" << std::endl;
+            // std::cout << "(" << points[1]->Pt[0] << ", " << points[1]->Pt[1] << ")" << std::endl;
+            // std::cout << "(" << points[2]->Pt[0] << ", " << points[2]->Pt[1] << ")" << std::endl;
+            // std::cout << "(" << points[3]->Pt[0] << ", " << points[3]->Pt[1] << ")" << std::endl;
             Curve curve1 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
             curve1->Points[1][0] = points[0]->Pt[0];
             curve1->Points[2][0] = points[0]->Pt[1];
@@ -280,14 +284,12 @@ void CurvesGenerator::generate_surfaces_from_junctions()
                     m_surfaces.push_back(IritSurface(CagdBilinearSrf(points[0].get(), points[1].get(), points[2].get(),
                                                                      points[3].get(), CAGD_PT_E2_TYPE),
                                                      CagdSrfFree));
-                    std::cout << "no intersection" << std::endl;
                 }
                 else
                 {
                     m_surfaces.push_back(IritSurface(CagdBilinearSrf(points[0].get(), points[1].get(), points[3].get(),
                                                                      points[2].get(), CAGD_PT_E2_TYPE),
                                                      CagdSrfFree));
-                    std::cout << "second intersection" << std::endl;
                 }
                 CagdPtFreeList(intersections2);
             }
@@ -309,14 +311,12 @@ void CurvesGenerator::generate_surfaces_from_junctions()
                     m_surfaces.push_back(IritSurface(CagdBilinearSrf(points[0].get(), points[2].get(), points[1].get(),
                                                                      points[3].get(), CAGD_PT_E2_TYPE),
                                                      CagdSrfFree));
-                    std::cout << "first intersection" << std::endl;
                 }
                 else
                 {
                     m_surfaces.push_back(IritSurface(CagdBilinearSrf(points[0].get(), points[2].get(), points[3].get(),
                                                                      points[1].get(), CAGD_PT_E2_TYPE),
                                                      CagdSrfFree));
-                    std::cout << "both intersections" << std::endl;
                 }
                 CagdPtFreeList(intersections2);
             }
@@ -368,6 +368,8 @@ void CurvesGenerator::generate_surfaces_from_curves()
                         intersection2_junction1 = t->Pt[0];
                     }
                 }
+                CagdPtFreeList(intersections1);
+                CagdPtFreeList(intersections2);
             }
         }
         if (junction2 != -1)
@@ -398,6 +400,8 @@ void CurvesGenerator::generate_surfaces_from_curves()
                         intersection2_junction2 = t->Pt[0];
                     }
                 }
+                CagdPtFreeList(intersections1);
+                CagdPtFreeList(intersections2);
             }
         }
         int proximity;
