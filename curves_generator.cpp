@@ -221,27 +221,7 @@ void CurvesGenerator::generate_surfaces_from_junctions()
 {
     for (const auto &junction_matcher : m_junction_to_curves)
     {
-        std::vector<IritPoint> points;
-        for (auto itr = junction_matcher.second.cbegin(); itr != junction_matcher.second.cend(); ++itr)
-        {
-            CagdCrvStruct *curve1 = *itr;
-            auto itr2 = itr;
-            for (itr2 = ++itr2; itr2 != junction_matcher.second.cend(); ++itr2)
-            {
-                CagdCrvStruct *curve2 = *itr2;
-                CagdPtStruct *intersections = CagdCrvCrvInter(curve1, curve2, 0.00001);
-                for (CagdPtStruct *t = intersections; t != nullptr; t = t->Pnext)
-                {
-                    if (t->Pt[0] > 0 && t->Pt[0] < 1)
-                    {
-                        CagdPtStruct *point = CagdPtNew();
-                        CAGD_CRV_EVAL_E2(curve1, t->Pt[0], &point->Pt[0]);
-                        points.push_back(IritPoint(point, CagdPtFree));
-                    }
-                }
-                CagdPtFreeList(intersections);
-            }
-        }
+        std::vector<IritPoint> points = get_intersection_points(junction_matcher);
         if (points.size() == 3)
         {
             m_surfaces.push_back(IritSurface(
@@ -250,77 +230,7 @@ void CurvesGenerator::generate_surfaces_from_junctions()
         }
         else if (points.size() == 4)
         {
-            // std::cout << "4 points:" << std::endl;
-            // std::cout << "(" << points[0]->Pt[0] << ", " << points[0]->Pt[1] << ")" << std::endl;
-            // std::cout << "(" << points[1]->Pt[0] << ", " << points[1]->Pt[1] << ")" << std::endl;
-            // std::cout << "(" << points[2]->Pt[0] << ", " << points[2]->Pt[1] << ")" << std::endl;
-            // std::cout << "(" << points[3]->Pt[0] << ", " << points[3]->Pt[1] << ")" << std::endl;
-            Curve curve1 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
-            curve1->Points[1][0] = points[0]->Pt[0];
-            curve1->Points[2][0] = points[0]->Pt[1];
-            curve1->Points[1][1] = points[1]->Pt[0];
-            curve1->Points[2][1] = points[1]->Pt[1];
-            Curve curve2 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
-            curve2->Points[1][0] = points[2]->Pt[0];
-            curve2->Points[2][0] = points[2]->Pt[1];
-            curve2->Points[1][1] = points[3]->Pt[0];
-            curve2->Points[2][1] = points[3]->Pt[1];
-            CagdPtStruct *intersections = CagdCrvCrvInter(curve1.get(), curve2.get(), 0.00001);
-            if (intersections == nullptr)
-            {
-                Curve curve3 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
-                curve3->Points[1][0] = points[0]->Pt[0];
-                curve3->Points[2][0] = points[0]->Pt[1];
-                curve3->Points[1][1] = points[2]->Pt[0];
-                curve3->Points[2][1] = points[2]->Pt[1];
-                Curve curve4 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
-                curve4->Points[1][0] = points[1]->Pt[0];
-                curve4->Points[2][0] = points[1]->Pt[1];
-                curve4->Points[1][1] = points[3]->Pt[0];
-                curve4->Points[2][1] = points[3]->Pt[1];
-                CagdPtStruct *intersections2 = CagdCrvCrvInter(curve3.get(), curve4.get(), 0.00001);
-                if (intersections2 == nullptr)
-                {
-                    m_surfaces.push_back(IritSurface(CagdBilinearSrf(points[0].get(), points[1].get(), points[2].get(),
-                                                                     points[3].get(), CAGD_PT_E2_TYPE),
-                                                     CagdSrfFree));
-                }
-                else
-                {
-                    m_surfaces.push_back(IritSurface(CagdBilinearSrf(points[0].get(), points[1].get(), points[3].get(),
-                                                                     points[2].get(), CAGD_PT_E2_TYPE),
-                                                     CagdSrfFree));
-                }
-                CagdPtFreeList(intersections2);
-            }
-            else
-            {
-                Curve curve3 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
-                curve3->Points[1][0] = points[0]->Pt[0];
-                curve3->Points[2][0] = points[0]->Pt[1];
-                curve3->Points[1][1] = points[1]->Pt[0];
-                curve3->Points[2][1] = points[1]->Pt[1];
-                Curve curve4 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
-                curve4->Points[1][0] = points[2]->Pt[0];
-                curve4->Points[2][0] = points[2]->Pt[1];
-                curve4->Points[1][1] = points[3]->Pt[0];
-                curve4->Points[2][1] = points[3]->Pt[1];
-                CagdPtStruct *intersections2 = CagdCrvCrvInter(curve3.get(), curve4.get(), 0.00001);
-                if (intersections2 == nullptr)
-                {
-                    m_surfaces.push_back(IritSurface(CagdBilinearSrf(points[0].get(), points[2].get(), points[1].get(),
-                                                                     points[3].get(), CAGD_PT_E2_TYPE),
-                                                     CagdSrfFree));
-                }
-                else
-                {
-                    m_surfaces.push_back(IritSurface(CagdBilinearSrf(points[0].get(), points[2].get(), points[3].get(),
-                                                                     points[1].get(), CAGD_PT_E2_TYPE),
-                                                     CagdSrfFree));
-                }
-                CagdPtFreeList(intersections2);
-            }
-            CagdPtFreeList(intersections);
+            add_surface_from_4_points(points[0], points[1], points[2], points[3]);
         }
     }
 }
@@ -342,67 +252,13 @@ void CurvesGenerator::generate_surfaces_from_curves()
         CagdRType intersection2_junction2 = 1;
         if (junction1 != -1)
         {
-            for (auto itr = m_junction_to_curves[junction1].cbegin(); itr != m_junction_to_curves[junction1].cend();
-                 ++itr)
-            {
-                CagdCrvStruct *match_curve = *itr;
-                if (match_curve == offset_curve1 || match_curve == offset_curve2)
-                {
-                    continue;
-                }
-                CagdPtStruct *intersections1 = CagdCrvCrvInter(offset_curve1, match_curve, 0.00001);
-                CagdPtStruct *intersections2 = CagdCrvCrvInter(offset_curve2, match_curve, 0.00001);
-                for (CagdPtStruct *t = intersections1; t != nullptr; t = t->Pnext)
-                {
-                    if (t->Pt[0] > 0 && t->Pt[0] < 1)
-                    {
-                        assert(intersection1_junction1 == 0 || intersection1_junction1 == 1);
-                        intersection1_junction1 = t->Pt[0];
-                    }
-                }
-                for (CagdPtStruct *t = intersections2; t != nullptr; t = t->Pnext)
-                {
-                    if (t->Pt[0] > 0 && t->Pt[0] < 1)
-                    {
-                        assert(intersection2_junction1 == 0 || intersection2_junction1 == 1);
-                        intersection2_junction1 = t->Pt[0];
-                    }
-                }
-                CagdPtFreeList(intersections1);
-                CagdPtFreeList(intersections2);
-            }
+            std::tie(intersection1_junction1, intersection2_junction1) =
+                get_curve_junctions_intersections(curve, junction1, 0);
         }
         if (junction2 != -1)
         {
-            for (auto itr = m_junction_to_curves[junction2].cbegin(); itr != m_junction_to_curves[junction2].cend();
-                 ++itr)
-            {
-                CagdCrvStruct *match_curve = *itr;
-                if (match_curve == offset_curve1 || match_curve == offset_curve2)
-                {
-                    continue;
-                }
-                CagdPtStruct *intersections1 = CagdCrvCrvInter(offset_curve1, match_curve, 0.00001);
-                CagdPtStruct *intersections2 = CagdCrvCrvInter(offset_curve2, match_curve, 0.00001);
-                for (CagdPtStruct *t = intersections1; t != nullptr; t = t->Pnext)
-                {
-                    if (t->Pt[0] > 0 && t->Pt[0] < 1)
-                    {
-                        assert(intersection1_junction2 == 0 || intersection1_junction2 == 1);
-                        intersection1_junction2 = t->Pt[0];
-                    }
-                }
-                for (CagdPtStruct *t = intersections2; t != nullptr; t = t->Pnext)
-                {
-                    if (t->Pt[0] > 0 && t->Pt[0] < 1)
-                    {
-                        assert(intersection2_junction2 == 0 || intersection2_junction2 == 1);
-                        intersection2_junction2 = t->Pt[0];
-                    }
-                }
-                CagdPtFreeList(intersections1);
-                CagdPtFreeList(intersections2);
-            }
+            std::tie(intersection1_junction2, intersection2_junction2) =
+                get_curve_junctions_intersections(curve, junction2, 1);
         }
         int proximity;
         CagdRType params1[2] = {intersection1_junction1, intersection1_junction2};
@@ -429,4 +285,124 @@ void CurvesGenerator::extrude_surfaces()
     {
         m_extrusions.push_back(IritTV(TrivExtrudeTV(surface.get(), &extrusion_vector), TrivTVFree));
     }
+}
+
+std::vector<IritPoint> CurvesGenerator::get_intersection_points(
+    const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher)
+{
+    std::vector<IritPoint> points;
+    for (auto itr = junction_matcher.second.cbegin(); itr != junction_matcher.second.cend(); ++itr)
+    {
+        CagdCrvStruct *curve1 = *itr;
+        auto itr2 = itr;
+        for (itr2 = ++itr2; itr2 != junction_matcher.second.cend(); ++itr2)
+        {
+            CagdCrvStruct *curve2 = *itr2;
+            CagdPtStruct *intersections = CagdCrvCrvInter(curve1, curve2, 0.00001);
+            for (CagdPtStruct *t = intersections; t != nullptr; t = t->Pnext)
+            {
+                if (t->Pt[0] > 0 && t->Pt[0] < 1)
+                {
+                    CagdPtStruct *point = CagdPtNew();
+                    CAGD_CRV_EVAL_E2(curve1, t->Pt[0], &point->Pt[0]);
+                    points.push_back(IritPoint(point, CagdPtFree));
+                }
+            }
+            CagdPtFreeList(intersections);
+        }
+    }
+    return points;
+}
+
+std::pair<CagdRType, CagdRType> CurvesGenerator::get_curve_junctions_intersections(const Curve &curve,
+                                                                                   VertexDescriptor junction,
+                                                                                   CagdRType default_value)
+{
+    CagdCrvStruct *offset_curve1 = m_curve_to_offset_curves[curve.get()][0];
+    CagdCrvStruct *offset_curve2 = m_curve_to_offset_curves[curve.get()][1];
+    CagdRType intersection_junction1 = default_value;
+    CagdRType intersection_junction2 = default_value;
+    for (auto itr = m_junction_to_curves[junction].cbegin(); itr != m_junction_to_curves[junction].cend(); ++itr)
+    {
+        CagdCrvStruct *match_curve = *itr;
+        if (match_curve == offset_curve1 || match_curve == offset_curve2)
+        {
+            continue;
+        }
+        CagdPtStruct *intersections1 = CagdCrvCrvInter(offset_curve1, match_curve, 0.00001);
+        CagdPtStruct *intersections2 = CagdCrvCrvInter(offset_curve2, match_curve, 0.00001);
+        for (CagdPtStruct *t = intersections1; t != nullptr; t = t->Pnext)
+        {
+            if (t->Pt[0] > 0 && t->Pt[0] < 1)
+            {
+                assert(intersection_junction1 == 0 || intersection_junction1 == 1);
+                intersection_junction1 = t->Pt[0];
+            }
+        }
+        for (CagdPtStruct *t = intersections2; t != nullptr; t = t->Pnext)
+        {
+            if (t->Pt[0] > 0 && t->Pt[0] < 1)
+            {
+                assert(intersection_junction2 == 0 || intersection_junction2 == 1);
+                intersection_junction2 = t->Pt[0];
+            }
+        }
+        CagdPtFreeList(intersections1);
+        CagdPtFreeList(intersections2);
+    }
+    return std::make_pair(intersection_junction1, intersection_junction2);
+}
+
+void CurvesGenerator::add_surface_from_4_points(const IritPoint &p0, const IritPoint &p1, const IritPoint &p2,
+                                                const IritPoint &p3)
+{
+    Curve curve1 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
+    curve1->Points[1][0] = p0->Pt[0];
+    curve1->Points[2][0] = p0->Pt[1];
+    curve1->Points[1][1] = p1->Pt[0];
+    curve1->Points[2][1] = p1->Pt[1];
+    Curve curve2 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
+    curve2->Points[1][0] = p2->Pt[0];
+    curve2->Points[2][0] = p2->Pt[1];
+    curve2->Points[1][1] = p3->Pt[0];
+    curve2->Points[2][1] = p3->Pt[1];
+    CagdPtStruct *intersections = CagdCrvCrvInter(curve1.get(), curve2.get(), 0.00001);
+    if (intersections == nullptr)
+    {
+        add_surface_from_2_lines(p0, p1, p2, p3);
+    }
+    else
+    {
+        add_surface_from_2_lines(p0, p2, p1, p3);
+    }
+    CagdPtFreeList(intersections);
+}
+
+void CurvesGenerator::add_surface_from_2_lines(const IritPoint &line0_p0, const IritPoint &line0_p1,
+                                               const IritPoint &line1_p0, const IritPoint &line1_p1)
+{
+    Curve curve1 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
+    curve1->Points[1][0] = line0_p0->Pt[0];
+    curve1->Points[2][0] = line0_p0->Pt[1];
+    curve1->Points[1][1] = line1_p0->Pt[0];
+    curve1->Points[2][1] = line1_p0->Pt[1];
+    Curve curve2 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
+    curve2->Points[1][0] = line0_p1->Pt[0];
+    curve2->Points[2][0] = line0_p1->Pt[1];
+    curve2->Points[1][1] = line1_p1->Pt[0];
+    curve2->Points[2][1] = line1_p1->Pt[1];
+    CagdPtStruct *intersections = CagdCrvCrvInter(curve1.get(), curve2.get(), 0.00001);
+    if (intersections == nullptr)
+    {
+        m_surfaces.push_back(IritSurface(
+            CagdBilinearSrf(line0_p0.get(), line0_p1.get(), line1_p0.get(), line1_p1.get(), CAGD_PT_E2_TYPE),
+            CagdSrfFree));
+    }
+    else
+    {
+        m_surfaces.push_back(IritSurface(
+            CagdBilinearSrf(line0_p0.get(), line0_p1.get(), line1_p1.get(), line1_p0.get(), CAGD_PT_E2_TYPE),
+            CagdSrfFree));
+    }
+    CagdPtFreeList(intersections);
 }

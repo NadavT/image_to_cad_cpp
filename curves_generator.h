@@ -25,6 +25,14 @@ class CurvesGenerator
     void generate_surfaces_from_curves();
     void extrude_surfaces();
 
+    std::vector<IritPoint> get_intersection_points(
+        const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher);
+    std::pair<CagdRType, CagdRType> get_curve_junctions_intersections(const Curve &curve, VertexDescriptor junction,
+                                                                      CagdRType default_value);
+    void add_surface_from_4_points(const IritPoint &p0, const IritPoint &p1, const IritPoint &p2, const IritPoint &p3);
+    void add_surface_from_2_lines(const IritPoint &line0_p0, const IritPoint &line0_p1, const IritPoint &line1_p0,
+                                  const IritPoint &line1_p1);
+
   private:
     Graph &m_graph;
     std::vector<Curve> m_height_curves;
