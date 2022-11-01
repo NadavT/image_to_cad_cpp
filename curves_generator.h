@@ -9,7 +9,7 @@ using OffsetCurveMatcher = std::unordered_map<CagdCrvStruct *, std::vector<CagdC
 class CurvesGenerator
 {
   public:
-    CurvesGenerator(Graph &graph, int max_order, double extrusion_amount);
+    CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount);
 
     std::vector<Curve> get_curves();
 
@@ -20,6 +20,7 @@ class CurvesGenerator
 
   private:
     void generate_curves();
+    void decrease_curves_order();
     void generate_offset_curves();
     void generate_surfaces_from_junctions();
     void generate_surfaces_from_curves();
@@ -38,6 +39,7 @@ class CurvesGenerator
     std::vector<Curve> m_height_curves;
     std::vector<std::tuple<Curve, Curve, Curve, VertexDescriptor, VertexDescriptor>> m_curves;
     int m_max_order;
+    int m_target_order;
     std::vector<OffsetCurveDetails> m_offset_curves;
     OffsetCurveMatcher m_curve_to_offset_curves;
     std::unordered_map<VertexDescriptor, std::vector<CagdCrvStruct *>> m_junction_to_curves;

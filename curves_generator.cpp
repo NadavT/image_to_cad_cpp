@@ -5,10 +5,11 @@
 
 #include <inc_irit/iritprsr.h>
 
-CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, double extrusion_amount)
+CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount)
     : m_graph(graph)
     , m_curves()
     , m_max_order(max_order)
+    , m_target_order(target_order)
     , m_offset_curves()
     , m_extrusion_amount(extrusion_amount)
 {
@@ -16,7 +17,12 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, double extrusion_a
     {
         m_max_order = std::numeric_limits<int>::max();
     }
+    if (target_order == -1)
+    {
+        m_target_order = m_max_order;
+    }
     TIMED_INNER_FUNCTION(generate_curves(), "Generating curves");
+    TIMED_INNER_FUNCTION(decrease_curves_order(), "Decrease curves order");
     TIMED_INNER_FUNCTION(generate_offset_curves(), "Generating offset curves");
     TIMED_INNER_FUNCTION(generate_surfaces_from_junctions(), "Generating surfaces from junctions");
     TIMED_INNER_FUNCTION(generate_surfaces_from_curves(), "Generating surfaces from curves");
@@ -164,6 +170,56 @@ void CurvesGenerator::generate_curves()
     }
 }
 
+void CurvesGenerator::decrease_curves_order()
+{
+    if (m_target_order == m_max_order)
+    {
+        return;
+    }
+
+    decltype(m_curves) new_curves;
+    decltype(m_height_curves) new_height_curves;
+    for (auto &item : m_curves)
+    {
+        Curve &original_curve = std::get<0>(item);
+        Curve &original_width_curve = std::get<1>(item);
+        Curve &original_opposite_width_curve = std::get<2>(item);
+        VertexDescriptor junction1 = std::get<3>(item);
+        VertexDescriptor junction2 = std::get<4>(item);
+        int length = original_curve->Length;
+        int order = (original_curve->Length > m_target_order - 1) ? m_target_order : original_curve->Length;
+        Curve curve = Curve(BspCrvNew(length, order, CAGD_PT_E2_TYPE), CagdCrvFree);
+        Curve width_curve = Curve(BspCrvNew(length, order, CAGD_PT_E1_TYPE), CagdCrvFree);
+        Curve opposite_width_curve = Curve(BspCrvNew(length, order, CAGD_PT_E1_TYPE), CagdCrvFree);
+        Curve height_curve = Curve(BspCrvNew(length, order, CAGD_PT_E3_TYPE), CagdCrvFree);
+        BspKnotUniformOpen(length, order, curve->KnotVector);
+        BspKnotUniformOpen(length, order, width_curve->KnotVector);
+        BspKnotUniformOpen(length, order, opposite_width_curve->KnotVector);
+        BspKnotUniformOpen(length, order, height_curve->KnotVector);
+        for (int i = 0; i < original_curve->Length; ++i)
+        {
+            CagdPtStruct *point = CagdPtNew();
+            CAGD_CRV_EVAL_E2(original_curve.get(), static_cast<CagdRType>(i) / (curve->Length - 1), &point->Pt[0]);
+            curve->Points[1][i] = point->Pt[0];
+            curve->Points[2][i] = point->Pt[1];
+            CAGD_CRV_EVAL_SCALAR(original_width_curve.get(), static_cast<CagdRType>(i) / (curve->Length - 1),
+                                 width_curve->Points[1][i]);
+            CAGD_CRV_EVAL_SCALAR(original_opposite_width_curve.get(), static_cast<CagdRType>(i) / (curve->Length - 1),
+                                 opposite_width_curve->Points[1][i]);
+
+            height_curve->Points[1][i] = curve->Points[1][i];
+            height_curve->Points[2][i] = curve->Points[2][i];
+            height_curve->Points[3][i] = width_curve->Points[1][i];
+            CagdPtFree(point);
+        }
+        new_curves.push_back(
+            {std::move(curve), std::move(width_curve), std::move(opposite_width_curve), junction1, junction2});
+        new_height_curves.push_back(std::move(height_curve));
+    }
+    m_curves = std::move(new_curves);
+    m_height_curves = std::move(new_height_curves);
+}
+
 void CurvesGenerator::generate_offset_curves()
 {
     int i = 0;
@@ -231,6 +287,10 @@ void CurvesGenerator::generate_surfaces_from_junctions()
         else if (points.size() == 4)
         {
             add_surface_from_4_points(points[0], points[1], points[2], points[3]);
+        }
+        else
+        {
+            std::cerr << "Error: junction with " << points.size() << " points" << std::endl;
         }
     }
 }

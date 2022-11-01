@@ -51,6 +51,10 @@ int main(int argc, char **argv)
         .help("Assign the maximal order of the curve (B-Spline), use -1 to unlimited (Bezier curve)")
         .default_value(4)
         .scan<'i', int>();
+    program.add_argument("-tco", "--target_curve_order")
+        .help("Assign the target order of the curve (B-Spline), use -1 to unlimited (Bezier curve)")
+        .default_value(4)
+        .scan<'i', int>();
     program.add_argument("-ex", "--extrusion").help("Extrusion amount").default_value(10.0).scan<'g', double>();
 
     try
@@ -89,6 +93,7 @@ int main(int argc, char **argv)
                        preprocess_image.get_colored_image().rows),
                    "Processing graph");
     TIMED_FUNCTION(CurvesGenerator curves_generator(process_graph.get_graph(), program.get<int>("--curve_order"),
+                                                    program.get<int>("--target_curve_order"),
                                                     program.get<double>("--extrusion")),
                    "Generating curves");
     TIMED_FUNCTION(curves_generator.write_curves("curves.itd"), "Exporting curves to file");
