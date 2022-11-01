@@ -22,14 +22,13 @@ class CurvesGenerator
     void generate_curves();
     void decrease_curves_order();
     void generate_offset_curves();
+    void sort_junction_curves();
     void generate_surfaces_from_junctions();
     void generate_surfaces_from_curves();
     void extrude_surfaces();
 
     std::vector<IritPoint> get_intersection_points(
         const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher);
-    std::pair<CagdRType, CagdRType> get_curve_junctions_intersections(const Curve &curve, VertexDescriptor junction,
-                                                                      CagdRType default_value);
     void add_surface_from_4_points(const IritPoint &p0, const IritPoint &p1, const IritPoint &p2, const IritPoint &p3);
     void add_surface_from_2_lines(const IritPoint &line0_p0, const IritPoint &line0_p1, const IritPoint &line1_p0,
                                   const IritPoint &line1_p1);
@@ -43,6 +42,8 @@ class CurvesGenerator
     std::vector<OffsetCurveDetails> m_offset_curves;
     OffsetCurveMatcher m_curve_to_offset_curves;
     std::unordered_map<VertexDescriptor, std::vector<CagdCrvStruct *>> m_junction_to_curves;
+    std::unordered_map<CagdCrvStruct *, std::unordered_map<VertexDescriptor, CagdRType>>
+        m_offset_curve_subdivision_params;
     std::vector<IritSurface> m_surfaces;
     double m_extrusion_amount;
     std::vector<IritTV> m_extrusions;

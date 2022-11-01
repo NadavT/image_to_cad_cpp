@@ -3,6 +3,8 @@
 #include "process_graph.h"
 #include "utils.h"
 
+#include <cmath>
+#include <execution>
 #include <inc_irit/iritprsr.h>
 
 CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount)
@@ -24,6 +26,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     TIMED_INNER_FUNCTION(generate_curves(), "Generating curves");
     TIMED_INNER_FUNCTION(decrease_curves_order(), "Decrease curves order");
     TIMED_INNER_FUNCTION(generate_offset_curves(), "Generating offset curves");
+    TIMED_INNER_FUNCTION(sort_junction_curves(), "Sorting junction curves");
     TIMED_INNER_FUNCTION(generate_surfaces_from_junctions(), "Generating surfaces from junctions");
     TIMED_INNER_FUNCTION(generate_surfaces_from_curves(), "Generating surfaces from curves");
     TIMED_INNER_FUNCTION(extrude_surfaces(), "Extruding surfaces");
@@ -179,8 +182,10 @@ void CurvesGenerator::decrease_curves_order()
 
     decltype(m_curves) new_curves;
     decltype(m_height_curves) new_height_curves;
-    for (auto &item : m_curves)
-    {
+    int i = 0;
+    std::mutex lock;
+    std::cout << "\t\tFinished " << i << " curves out of " << m_curves.size() << std::endl;
+    std::for_each(std::execution::par, std::begin(m_curves), std::end(m_curves), [&](auto &item) {
         Curve &original_curve = std::get<0>(item);
         Curve &original_width_curve = std::get<1>(item);
         Curve &original_opposite_width_curve = std::get<2>(item);
@@ -196,26 +201,31 @@ void CurvesGenerator::decrease_curves_order()
         BspKnotUniformOpen(length, order, width_curve->KnotVector);
         BspKnotUniformOpen(length, order, opposite_width_curve->KnotVector);
         BspKnotUniformOpen(length, order, height_curve->KnotVector);
-        for (int i = 0; i < original_curve->Length; ++i)
+        for (int j = 0; j < original_curve->Length; ++j)
         {
             CagdPtStruct *point = CagdPtNew();
-            CAGD_CRV_EVAL_E2(original_curve.get(), static_cast<CagdRType>(i) / (curve->Length - 1), &point->Pt[0]);
-            curve->Points[1][i] = point->Pt[0];
-            curve->Points[2][i] = point->Pt[1];
-            CAGD_CRV_EVAL_SCALAR(original_width_curve.get(), static_cast<CagdRType>(i) / (curve->Length - 1),
-                                 width_curve->Points[1][i]);
-            CAGD_CRV_EVAL_SCALAR(original_opposite_width_curve.get(), static_cast<CagdRType>(i) / (curve->Length - 1),
-                                 opposite_width_curve->Points[1][i]);
+            CAGD_CRV_EVAL_E2(original_curve.get(), static_cast<CagdRType>(j) / (curve->Length - 1), &point->Pt[0]);
+            curve->Points[1][j] = point->Pt[0];
+            curve->Points[2][j] = point->Pt[1];
+            CAGD_CRV_EVAL_SCALAR(original_width_curve.get(), static_cast<CagdRType>(j) / (curve->Length - 1),
+                                 width_curve->Points[1][j]);
+            CAGD_CRV_EVAL_SCALAR(original_opposite_width_curve.get(), static_cast<CagdRType>(j) / (curve->Length - 1),
+                                 opposite_width_curve->Points[1][j]);
 
-            height_curve->Points[1][i] = curve->Points[1][i];
-            height_curve->Points[2][i] = curve->Points[2][i];
-            height_curve->Points[3][i] = width_curve->Points[1][i];
+            height_curve->Points[1][j] = curve->Points[1][j];
+            height_curve->Points[2][j] = curve->Points[2][j];
+            height_curve->Points[3][j] = width_curve->Points[1][j];
             CagdPtFree(point);
         }
+        lock.lock();
         new_curves.push_back(
             {std::move(curve), std::move(width_curve), std::move(opposite_width_curve), junction1, junction2});
         new_height_curves.push_back(std::move(height_curve));
-    }
+        i++;
+        std::cout << "\x1b[A";
+        std::cout << "\t\tFinished " << i << " curves out of " << m_curves.size() << std::endl;
+        lock.unlock();
+    });
     m_curves = std::move(new_curves);
     m_height_curves = std::move(new_height_curves);
 }
@@ -223,13 +233,10 @@ void CurvesGenerator::decrease_curves_order()
 void CurvesGenerator::generate_offset_curves()
 {
     int i = 0;
-    for (auto &item : m_curves)
-    {
-        if (i != 0)
-        {
-            std::cout << "\x1b[A";
-        }
-        std::cout << "\t\tFinished " << i << " curves out of " << m_curves.size() << std::endl;
+    std::mutex lock;
+    std::cout << "\t\tFinished " << i << " curves out of " << m_curves.size() << std::endl;
+    std::for_each(std::execution::par, std::begin(m_curves), std::end(m_curves), [&](auto &item) {
+        lock.lock();
         const Curve &curve = std::get<0>(item);
         const Curve &width_curve = std::get<1>(item);
         const Curve &opposite_width_curve = std::get<2>(item);
@@ -250,33 +257,52 @@ void CurvesGenerator::generate_offset_curves()
                 m_junction_to_curves[std::get<4>(item)] = std::vector<CagdCrvStruct *>();
             }
         }
+        lock.unlock();
         Curve offset_curve = Curve(SymbCrvVarOffset(curve.get(), width_curve.get(), FALSE), CagdCrvFree);
         Curve opposite_offset_curve =
             Curve(SymbCrvVarOffset(curve.get(), opposite_width_curve.get(), FALSE), CagdCrvFree);
         // Curve offset_curve = Curve(SymbCrvOffset(curve.get(), 1, FALSE), CagdCrvFree);
         // Curve opposite_offset_curve = Curve(SymbCrvOffset(curve.get(), -1, FALSE), CagdCrvFree);
+        lock.lock();
         m_offset_curves.push_back({std::move(offset_curve), junctions});
         m_offset_curves.push_back({std::move(opposite_offset_curve), junctions});
         m_curve_to_offset_curves[curve.get()] = {std::get<0>(m_offset_curves.back()).get(),
                                                  std::get<0>(*std::prev(m_offset_curves.end(), 2)).get()};
         for (const auto &junction : junctions)
         {
-            m_junction_to_curves[junction].push_back(std::get<0>(m_offset_curves.back()).get());
-            m_junction_to_curves[junction].push_back(std::get<0>(*std::prev(m_offset_curves.end(), 2)).get());
+            m_junction_to_curves[junction].push_back(curve.get());
+            // m_junction_to_curves[junction].push_back(std::get<0>(m_offset_curves.back()).get());
+            // m_junction_to_curves[junction].push_back(std::get<0>(*std::prev(m_offset_curves.end(), 2)).get());
         }
         i++;
-    }
-    if (i != 0)
-    {
         std::cout << "\x1b[A";
+        std::cout << "\t\tFinished " << i << " curves out of " << m_curves.size() << std::endl;
+        lock.unlock();
+    });
+}
+
+void CurvesGenerator::sort_junction_curves()
+{
+    for (auto &item : m_junction_to_curves)
+    {
+        const cv::Point &junction_point = m_graph[item.first].p;
+        std::sort(
+            item.second.begin(), item.second.end(), [junction_point](const CagdCrvStruct *a, const CagdCrvStruct *b) {
+                double a_cartesian = std::atan2(a->Points[1][1] - junction_point.x, a->Points[2][1] - junction_point.y);
+                double b_cartesian = std::atan2(b->Points[1][1] - junction_point.x, b->Points[2][1] - junction_point.y);
+                return a_cartesian < b_cartesian;
+            });
     }
-    std::cout << "\t\tFinished " << i << " curves out of " << m_curves.size() << std::endl;
 }
 
 void CurvesGenerator::generate_surfaces_from_junctions()
 {
     for (const auto &junction_matcher : m_junction_to_curves)
     {
+        if (junction_matcher.second.size() < 2)
+        {
+            continue;
+        }
         std::vector<IritPoint> points = get_intersection_points(junction_matcher);
         if (points.size() == 3)
         {
@@ -306,29 +332,41 @@ void CurvesGenerator::generate_surfaces_from_curves()
         assert(m_curve_to_offset_curves[curve.get()].size() == 2);
         CagdCrvStruct *offset_curve1 = m_curve_to_offset_curves[curve.get()][0];
         CagdCrvStruct *offset_curve2 = m_curve_to_offset_curves[curve.get()][1];
-        CagdRType intersection1_junction1 = 0;
-        CagdRType intersection2_junction1 = 0;
-        CagdRType intersection1_junction2 = 1;
-        CagdRType intersection2_junction2 = 1;
-        if (junction1 != -1)
+        CagdRType offset_curve1_junction1_subdiv = 0;
+        CagdRType offset_curve2_junction1_subdiv = 0;
+        CagdRType offset_curve1_junction2_subdiv = 1;
+        CagdRType offset_curve2_junction2_subdiv = 1;
+        if (m_offset_curve_subdivision_params.count(offset_curve1) > 0)
         {
-            std::tie(intersection1_junction1, intersection2_junction1) =
-                get_curve_junctions_intersections(curve, junction1, 0);
+            if (m_offset_curve_subdivision_params[offset_curve1].count(junction1) > 0)
+            {
+                offset_curve1_junction1_subdiv = m_offset_curve_subdivision_params[offset_curve1][junction1];
+            }
+            if (m_offset_curve_subdivision_params[offset_curve1].count(junction2) > 0)
+            {
+                offset_curve1_junction2_subdiv = m_offset_curve_subdivision_params[offset_curve1][junction2];
+            }
         }
-        if (junction2 != -1)
+        if (m_offset_curve_subdivision_params.count(offset_curve2) > 0)
         {
-            std::tie(intersection1_junction2, intersection2_junction2) =
-                get_curve_junctions_intersections(curve, junction2, 1);
+            if (m_offset_curve_subdivision_params[offset_curve2].count(junction1) > 0)
+            {
+                offset_curve2_junction1_subdiv = m_offset_curve_subdivision_params[offset_curve2][junction1];
+            }
+            if (m_offset_curve_subdivision_params[offset_curve2].count(junction2) > 0)
+            {
+                offset_curve2_junction2_subdiv = m_offset_curve_subdivision_params[offset_curve2][junction2];
+            }
         }
         int proximity;
-        CagdRType params1[2] = {intersection1_junction1, intersection1_junction2};
-        CagdRType params2[2] = {intersection2_junction1, intersection2_junction2};
+        CagdRType params1[2] = {offset_curve1_junction1_subdiv, offset_curve1_junction2_subdiv};
+        CagdRType params2[2] = {offset_curve2_junction1_subdiv, offset_curve2_junction2_subdiv};
         CagdCrvStruct *sliced_offset_curve1 = CagdCrvSubdivAtParams3(offset_curve1, params1, 2, 0, FALSE, &proximity);
         CagdCrvStruct *sliced_offset_curve2 = CagdCrvSubdivAtParams3(offset_curve2, params2, 2, 0, FALSE, &proximity);
         CagdCrvStruct *wanted_curve1 =
-            (intersection1_junction1 > 0) ? sliced_offset_curve1->Pnext : sliced_offset_curve1;
+            (offset_curve1_junction1_subdiv > 0) ? sliced_offset_curve1->Pnext : sliced_offset_curve1;
         CagdCrvStruct *wanted_curve2 =
-            (intersection2_junction1 > 0) ? sliced_offset_curve2->Pnext : sliced_offset_curve2;
+            (offset_curve2_junction1_subdiv > 0) ? sliced_offset_curve2->Pnext : sliced_offset_curve2;
         m_surfaces.push_back(IritSurface(CagdRuledSrf(wanted_curve1, wanted_curve2, 2, 2), CagdSrfFree));
         CagdCrvFreeList(sliced_offset_curve1);
         CagdCrvFreeList(sliced_offset_curve2);
@@ -351,66 +389,42 @@ std::vector<IritPoint> CurvesGenerator::get_intersection_points(
     const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher)
 {
     std::vector<IritPoint> points;
-    for (auto itr = junction_matcher.second.cbegin(); itr != junction_matcher.second.cend(); ++itr)
+    for (size_t i = 0; i < junction_matcher.second.size(); ++i)
     {
-        CagdCrvStruct *curve1 = *itr;
-        auto itr2 = itr;
-        for (itr2 = ++itr2; itr2 != junction_matcher.second.cend(); ++itr2)
+        CagdCrvStruct *curve = junction_matcher.second[i];
+        CagdCrvStruct *next_curve = junction_matcher.second[(i + 1) % junction_matcher.second.size()];
+        bool found = false;
+        for (auto offset_curve : m_curve_to_offset_curves[curve])
         {
-            CagdCrvStruct *curve2 = *itr2;
-            CagdPtStruct *intersections = CagdCrvCrvInter(curve1, curve2, 0.00001);
-            for (CagdPtStruct *t = intersections; t != nullptr; t = t->Pnext)
+            for (auto next_offset_curve : m_curve_to_offset_curves[next_curve])
             {
-                if (t->Pt[0] > 0 && t->Pt[0] < 1)
+                CagdPtStruct *intersections = CagdCrvCrvInter(offset_curve, next_offset_curve, 0.00001);
+                CagdPtStruct *intersections2 = CagdCrvCrvInter(next_offset_curve, offset_curve, 0.00001);
+                for (auto [t, t2] = std::tuple{intersections, intersections2}; t != nullptr && t2 != nullptr;
+                     t = t->Pnext, t2 = t2->Pnext)
                 {
-                    CagdPtStruct *point = CagdPtNew();
-                    CAGD_CRV_EVAL_E2(curve1, t->Pt[0], &point->Pt[0]);
-                    points.push_back(IritPoint(point, CagdPtFree));
+                    if (t->Pt[0] > 0 && t->Pt[0] < 1)
+                    {
+                        if (found)
+                        {
+                            std::cerr << "Found more than one intersection in junction" << std::endl;
+                        }
+                        else
+                        {
+                            CagdPtStruct *point = CagdPtNew();
+                            CAGD_CRV_EVAL_E2(offset_curve, t->Pt[0], &point->Pt[0]);
+                            points.push_back(IritPoint(point, CagdPtFree));
+                            m_offset_curve_subdivision_params[offset_curve][junction_matcher.first] = t->Pt[0];
+                            m_offset_curve_subdivision_params[next_offset_curve][junction_matcher.first] = t2->Pt[0];
+                            found = true;
+                        }
+                    }
                 }
+                CagdPtFreeList(intersections);
             }
-            CagdPtFreeList(intersections);
         }
     }
     return points;
-}
-
-std::pair<CagdRType, CagdRType> CurvesGenerator::get_curve_junctions_intersections(const Curve &curve,
-                                                                                   VertexDescriptor junction,
-                                                                                   CagdRType default_value)
-{
-    CagdCrvStruct *offset_curve1 = m_curve_to_offset_curves[curve.get()][0];
-    CagdCrvStruct *offset_curve2 = m_curve_to_offset_curves[curve.get()][1];
-    CagdRType intersection_junction1 = default_value;
-    CagdRType intersection_junction2 = default_value;
-    for (auto itr = m_junction_to_curves[junction].cbegin(); itr != m_junction_to_curves[junction].cend(); ++itr)
-    {
-        CagdCrvStruct *match_curve = *itr;
-        if (match_curve == offset_curve1 || match_curve == offset_curve2)
-        {
-            continue;
-        }
-        CagdPtStruct *intersections1 = CagdCrvCrvInter(offset_curve1, match_curve, 0.00001);
-        CagdPtStruct *intersections2 = CagdCrvCrvInter(offset_curve2, match_curve, 0.00001);
-        for (CagdPtStruct *t = intersections1; t != nullptr; t = t->Pnext)
-        {
-            if (t->Pt[0] > 0 && t->Pt[0] < 1)
-            {
-                assert(intersection_junction1 == 0 || intersection_junction1 == 1);
-                intersection_junction1 = t->Pt[0];
-            }
-        }
-        for (CagdPtStruct *t = intersections2; t != nullptr; t = t->Pnext)
-        {
-            if (t->Pt[0] > 0 && t->Pt[0] < 1)
-            {
-                assert(intersection_junction2 == 0 || intersection_junction2 == 1);
-                intersection_junction2 = t->Pt[0];
-            }
-        }
-        CagdPtFreeList(intersections1);
-        CagdPtFreeList(intersections2);
-    }
-    return std::make_pair(intersection_junction1, intersection_junction2);
 }
 
 void CurvesGenerator::add_surface_from_4_points(const IritPoint &p0, const IritPoint &p1, const IritPoint &p2,
