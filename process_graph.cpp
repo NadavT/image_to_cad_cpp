@@ -176,43 +176,49 @@ void ProcessGraph::remove_hanging()
 
 void ProcessGraph::collapse_junctions(double junction_collapse_threshold)
 {
-    std::vector<VertexDescriptor> junctions = get_junctions();
-    std::set<VertexDescriptor> collapsed;
-
-    for (VertexDescriptor junction : junctions)
+    bool changed = true;
+    while (changed)
     {
-        if (collapsed.count(junction) > 0)
+        changed = false;
+        std::vector<VertexDescriptor> junctions = get_junctions();
+        std::set<VertexDescriptor> collapsed;
+
+        for (VertexDescriptor junction : junctions)
         {
-            continue;
-        }
-        bool reset = true;
-        while (reset)
-        {
-            reset = false;
-            for (const auto &neighbor : boost::make_iterator_range(boost::adjacent_vertices(junction, m_graph)))
+            if (collapsed.count(junction) > 0)
             {
-                double length = 0;
-                std::vector<VertexDescriptor> route;
-                std::tie(length, route, std::ignore) = walk_to_next_junction(junction, neighbor, m_graph);
-                if (length < junction_collapse_threshold)
+                continue;
+            }
+            bool reset = true;
+            while (reset)
+            {
+                reset = false;
+                for (const auto &neighbor : boost::make_iterator_range(boost::adjacent_vertices(junction, m_graph)))
                 {
-                    for (const auto &vertex : route)
+                    double length = 0;
+                    std::vector<VertexDescriptor> route;
+                    std::tie(length, route, std::ignore) = walk_to_next_junction(junction, neighbor, m_graph);
+                    if (length < junction_collapse_threshold)
                     {
-                        if (vertex == junction || vertex == route.back())
+                        for (const auto &vertex : route)
                         {
-                            collapsed.insert(vertex);
-                            continue;
+                            if (vertex == junction || vertex == route.back())
+                            {
+                                collapsed.insert(vertex);
+                                continue;
+                            }
+                            boost::clear_vertex(vertex, m_graph);
                         }
-                        boost::clear_vertex(vertex, m_graph);
+                        contract_vertices(junction, route.back());
+                        m_graph[junction].p = (m_graph[junction].p + m_graph[route.back()].p) / 2;
+                        auto incident_segment = m_graph[junction].incident_segment;
+                        m_graph[junction].distance_to_source =
+                            distance_to_edge(m_graph[junction].p, incident_segment[0], incident_segment[1]);
+                        smooth_neighbors(junction, length);
+                        reset = true;
+                        changed = true;
+                        break;
                     }
-                    contract_vertices(junction, route.back());
-                    m_graph[junction].p = (m_graph[junction].p + m_graph[route.back()].p) / 2;
-                    auto incident_segment = m_graph[junction].incident_segment;
-                    m_graph[junction].distance_to_source =
-                        distance_to_edge(m_graph[junction].p, incident_segment[0], incident_segment[1]);
-                    smooth_neighbors(junction, length);
-                    reset = true;
-                    break;
                 }
             }
         }

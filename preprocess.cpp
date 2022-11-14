@@ -23,7 +23,7 @@ PreprocessImage::PreprocessImage(const Image &image, double scale_factor, double
 
     cv::resize(m_grayscale_image, m_grayscale_image,
                cv::Size(m_grayscale_image.cols * scale_factor, m_grayscale_image.rows * scale_factor), 0, 0,
-               cv::INTER_NEAREST_EXACT);
+               cv::INTER_LINEAR);
 
     TIMED_INNER_FUNCTION(find_segments(), "finding segments");
 

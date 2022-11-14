@@ -107,14 +107,15 @@ bool VoronoiCalculator::check_mask(int x, int y)
     {
         return false;
     }
-    return m_image.at<cv::Vec3b>({x, y})[2] == 255;
+    return m_image.at<cv::Vec3b>({x, y})[2] > 120;
 }
 
 void VoronoiCalculator::draw_graph()
 {
     int width = m_image.cols;
     int height = m_image.rows;
-    cv::Mat image2(m_image);
+    cv::Mat image2(m_image.clone());
+    cv::Mat image3(m_image.clone());
     cv::Mat image_vor(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
     int line_width = 1;
     for (const auto &segment : m_segments)
@@ -137,6 +138,7 @@ void VoronoiCalculator::draw_graph()
             {
                 cv::Point start_p(start->x(), start->y());
                 cv::Point end_p(end->x(), end->y());
+                cv::line(image3, start_p, end_p, cv::Scalar(0, 0, 255), line_width);
                 if (start_p != end_p && m_added_edges.count({start_p, end_p}) == 0 &&
                     m_added_edges.count({end_p, start_p}) == 0)
                 {
@@ -247,6 +249,7 @@ void VoronoiCalculator::draw_graph()
     }
     cv::imwrite("voronoi.png", image_vor);
     cv::imwrite("voronoi2.png", image2);
+    cv::imwrite("voronoi4.png", image3);
 
     cv::Mat image_graph(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
 

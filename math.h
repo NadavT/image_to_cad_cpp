@@ -28,4 +28,17 @@ static inline double distance_to_edge(cv::Point point, cv::Point edge_start, cv:
     return distance(point, projection);
 }
 
+static inline double angle_between(cv::Point p0, cv::Point midpoint, cv::Point p1)
+{
+    cv::Point v1 = p0 - midpoint;
+    cv::Point v2 = midpoint - p1;
+    double dot = v1.dot(v2);
+    return std::acos(dot / (cv::norm(v1) * cv::norm(v2)));
+}
+
+static inline double degrees_to_radians(double degrees)
+{
+    return degrees * M_PI / 180.0;
+}
+
 #endif /* MATH_H */

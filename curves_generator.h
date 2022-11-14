@@ -27,6 +27,9 @@ class CurvesGenerator
     void generate_surfaces_from_curves();
     void extrude_surfaces();
 
+    std::vector<std::pair<std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>>> split_junction_walk(
+        const std::pair<std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> &junction_walk);
+    void generate_curve(const std::vector<VertexDescriptor> &route, const std::vector<EdgeDescriptor> &route_edges);
     std::vector<IritPoint> get_intersection_points(
         const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher);
     void add_surface_from_4_points(const IritPoint &p0, const IritPoint &p1, const IritPoint &p2, const IritPoint &p3);

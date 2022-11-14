@@ -1,5 +1,6 @@
 #include "curves_generator.h"
 
+#include "math.h"
 #include "process_graph.h"
 #include "utils.h"
 
@@ -102,7 +103,6 @@ void CurvesGenerator::generate_curves()
     {
         EdgeDescriptor edge;
         VertexDescriptor junction = -1;
-        VertexDescriptor junction2 = -1;
         // Take candidate if available
         if (candidates.size() > 0)
         {
@@ -124,46 +124,10 @@ void CurvesGenerator::generate_curves()
         std::vector<EdgeDescriptor> route_edges;
         std::tie(std::ignore, route, route_edges) = ProcessGraph::walk_to_next_junction(
             boost::source(edge, m_graph), boost::target(edge, m_graph), m_graph, true);
-        if (route.back() != route.front())
+        for (auto &item : split_junction_walk({route, route_edges}))
         {
-            junction2 = route.back();
+            generate_curve(item.first, item.second);
         }
-
-        // Add curve
-        Curve curve = Curve(
-            BspCrvNew(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E2_TYPE),
-            CagdCrvFree);
-        Curve width_curve = Curve(
-            BspCrvNew(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E1_TYPE),
-            CagdCrvFree);
-        Curve opposite_width_curve = Curve(
-            BspCrvNew(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E1_TYPE),
-            CagdCrvFree);
-        Curve height_curve = Curve(
-            BspCrvNew(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E3_TYPE),
-            CagdCrvFree);
-        BspKnotUniformOpen(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(),
-                           curve->KnotVector);
-        BspKnotUniformOpen(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(),
-                           width_curve->KnotVector);
-        BspKnotUniformOpen(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(),
-                           opposite_width_curve->KnotVector);
-        BspKnotUniformOpen(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(),
-                           height_curve->KnotVector);
-        for (int i = 0; i < route.size(); ++i)
-        {
-            curve->Points[1][i] = m_graph[route[i]].p.x;
-            curve->Points[2][i] = m_graph[route[i]].p.y;
-            width_curve->Points[1][i] = m_graph[route[i]].distance_to_source;
-            opposite_width_curve->Points[1][i] = -m_graph[route[i]].distance_to_source;
-
-            height_curve->Points[1][i] = m_graph[route[i]].p.x;
-            height_curve->Points[2][i] = m_graph[route[i]].p.y;
-            height_curve->Points[3][i] = m_graph[route[i]].distance_to_source;
-        }
-        m_curves.push_back(
-            {std::move(curve), std::move(width_curve), std::move(opposite_width_curve), junction, junction2});
-        m_height_curves.push_back(std::move(height_curve));
 
         // Clean route_edges
         for (const auto &edge : route_edges)
@@ -288,8 +252,8 @@ void CurvesGenerator::sort_junction_curves()
         const cv::Point &junction_point = m_graph[item.first].p;
         std::sort(
             item.second.begin(), item.second.end(), [junction_point](const CagdCrvStruct *a, const CagdCrvStruct *b) {
-                double a_cartesian = std::atan2(a->Points[1][1] - junction_point.x, a->Points[2][1] - junction_point.y);
-                double b_cartesian = std::atan2(b->Points[1][1] - junction_point.x, b->Points[2][1] - junction_point.y);
+                double a_cartesian = std::atan2(a->Points[2][1] - junction_point.y, a->Points[1][1] - junction_point.x);
+                double b_cartesian = std::atan2(b->Points[2][1] - junction_point.y, b->Points[1][1] - junction_point.x);
                 return a_cartesian < b_cartesian;
             });
     }
@@ -316,7 +280,22 @@ void CurvesGenerator::generate_surfaces_from_junctions()
         }
         else
         {
-            std::cerr << "Error: junction with " << points.size() << " points" << std::endl;
+            const cv::Point &junction_point = m_graph[junction_matcher.first].p;
+            std::sort(points.begin(), points.end(), [junction_point](const IritPoint &a, const IritPoint &b) {
+                double a_cartesian = std::atan2(a->Pt[1] - junction_point.y, a->Pt[0] - junction_point.x);
+                double b_cartesian = std::atan2(b->Pt[1] - junction_point.y, b->Pt[0] - junction_point.x);
+                return a_cartesian < b_cartesian;
+            });
+            IritPoint pivot = IritPoint(CagdPtNew(), CagdPtFree);
+            pivot->Pt[0] = junction_point.x;
+            pivot->Pt[1] = junction_point.y;
+            for (int i = 0; i < points.size(); i++)
+            {
+                m_surfaces.push_back(
+                    IritSurface(CagdBilinearSrf(points[i].get(), pivot.get(), points[(i + 1) % points.size()].get(),
+                                                pivot.get(), CAGD_PT_E2_TYPE),
+                                CagdSrfFree));
+            }
         }
     }
 }
@@ -385,42 +364,224 @@ void CurvesGenerator::extrude_surfaces()
     }
 }
 
+std::vector<std::pair<std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>>> CurvesGenerator::split_junction_walk(
+    const std::pair<std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> &junction_walk)
+{
+    if (junction_walk.first.size() < 4)
+    {
+        return {junction_walk};
+    }
+    VertexDescriptor prev = junction_walk.first[0];
+    VertexDescriptor current = junction_walk.first[1];
+    VertexDescriptor next = junction_walk.first[2];
+    double prev_angle = angle_between(m_graph[prev].p, m_graph[current].p, m_graph[next].p);
+    while (prev_angle < 0)
+    {
+        prev_angle += M_PI / 2;
+    }
+    while (prev_angle > M_PI / 2)
+    {
+        prev_angle -= M_PI / 2;
+    }
+    for (size_t i = 1; i < junction_walk.first.size() - 1; ++i)
+    {
+        VertexDescriptor prev = junction_walk.first[i - 1];
+        VertexDescriptor current = junction_walk.first[i];
+        VertexDescriptor next = junction_walk.first[i + 1];
+        double current_angle = angle_between(m_graph[prev].p, m_graph[current].p, m_graph[next].p);
+        if (std::abs(current_angle - prev_angle) > degrees_to_radians(45))
+        {
+            std::vector<VertexDescriptor> first_half(junction_walk.first.begin(), junction_walk.first.begin() + i + 1);
+            std::vector<VertexDescriptor> second_half(junction_walk.first.begin() + i, junction_walk.first.end());
+            std::vector<EdgeDescriptor> first_half_edges(junction_walk.second.begin(),
+                                                         junction_walk.second.begin() + i);
+            std::vector<EdgeDescriptor> second_half_edges(junction_walk.second.begin() + i - 1,
+                                                          junction_walk.second.end());
+            std::vector<std::pair<std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>>> splitted =
+                split_junction_walk({second_half, second_half_edges});
+            splitted.insert(splitted.begin(), {first_half, first_half_edges});
+            return splitted;
+        }
+    }
+    return {junction_walk};
+}
+
+void CurvesGenerator::generate_curve(const std::vector<VertexDescriptor> &route,
+                                     const std::vector<EdgeDescriptor> &route_edges)
+{
+    VertexDescriptor junction = route.front();
+    VertexDescriptor junction2 = (route.back() != route.front()) ? route.back() : -1;
+
+    // Add curve
+    Curve curve =
+        Curve(BspCrvNew(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E2_TYPE),
+              CagdCrvFree);
+    Curve width_curve =
+        Curve(BspCrvNew(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E1_TYPE),
+              CagdCrvFree);
+    Curve opposite_width_curve =
+        Curve(BspCrvNew(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E1_TYPE),
+              CagdCrvFree);
+    Curve height_curve =
+        Curve(BspCrvNew(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), CAGD_PT_E3_TYPE),
+              CagdCrvFree);
+    BspKnotUniformOpen(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(), curve->KnotVector);
+    BspKnotUniformOpen(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(),
+                       width_curve->KnotVector);
+    BspKnotUniformOpen(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(),
+                       opposite_width_curve->KnotVector);
+    BspKnotUniformOpen(route.size(), (route.size() > m_max_order - 1) ? m_max_order : route.size(),
+                       height_curve->KnotVector);
+    for (int i = 0; i < route.size(); ++i)
+    {
+        double distance = m_graph[route[i]].distance_to_source;
+        // if (i == 0)
+        // {
+        //     distance = m_graph[route[i + 1]].distance_to_source;
+        // }
+        // if (i == route.size() - 1)
+        // {
+        //     distance = m_graph[route[i - 1]].distance_to_source;
+        // }
+        curve->Points[1][i] = m_graph[route[i]].p.x;
+        curve->Points[2][i] = m_graph[route[i]].p.y;
+        width_curve->Points[1][i] = distance;
+        opposite_width_curve->Points[1][i] = -distance;
+
+        height_curve->Points[1][i] = m_graph[route[i]].p.x;
+        height_curve->Points[2][i] = m_graph[route[i]].p.y;
+        height_curve->Points[3][i] = distance;
+    }
+    m_curves.push_back(
+        {std::move(curve), std::move(width_curve), std::move(opposite_width_curve), junction, junction2});
+    m_height_curves.push_back(std::move(height_curve));
+}
+
 std::vector<IritPoint> CurvesGenerator::get_intersection_points(
     const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher)
 {
     std::vector<IritPoint> points;
+    std::unordered_map<CagdCrvStruct *, CagdRType> curve_to_subdiv;
+    std::unordered_map<CagdCrvStruct *, CagdCrvStruct *> curve_to_curve;
     for (size_t i = 0; i < junction_matcher.second.size(); ++i)
     {
         CagdCrvStruct *curve = junction_matcher.second[i];
         CagdCrvStruct *next_curve = junction_matcher.second[(i + 1) % junction_matcher.second.size()];
         bool found = false;
+        CagdCrvStruct *choosen_curve = nullptr;
+        CagdCrvStruct *choosen_next_curve = nullptr;
+        CagdRType choosen_t1 = 0;
+        CagdRType choosen_t2 = 0;
         for (auto offset_curve : m_curve_to_offset_curves[curve])
         {
             for (auto next_offset_curve : m_curve_to_offset_curves[next_curve])
             {
                 CagdPtStruct *intersections = CagdCrvCrvInter(offset_curve, next_offset_curve, 0.00001);
                 CagdPtStruct *intersections2 = CagdCrvCrvInter(next_offset_curve, offset_curve, 0.00001);
-                for (auto [t, t2] = std::tuple{intersections, intersections2}; t != nullptr && t2 != nullptr;
-                     t = t->Pnext, t2 = t2->Pnext)
+                for (CagdPtStruct *t = intersections; t != nullptr; t = t->Pnext)
                 {
+                    assert(intersections2 != nullptr);
                     if (t->Pt[0] > 0 && t->Pt[0] < 1)
                     {
                         if (found)
                         {
-                            std::cerr << "Found more than one intersection in junction" << std::endl;
+                            // std::cerr << "Found more than one intersection in junction" << std::endl;
                         }
-                        else
+                        CagdRType sub1 = std::min(t->Pt[0], 1 - t->Pt[0]);
+                        CagdRType sub2 = std::min(choosen_t1, 1 - choosen_t1);
+                        if (sub1 > sub2)
                         {
+                            if (curve_to_subdiv.count(offset_curve) > 0)
+                            {
+                                CagdRType sub3 =
+                                    std::min(curve_to_subdiv[offset_curve], 1 - curve_to_subdiv[offset_curve]);
+                                if (sub1 < sub3 || curve_to_curve[offset_curve] == next_offset_curve)
+                                {
+                                    continue;
+                                }
+                            }
+                            CagdPtStruct *t2 = intersections2;
                             CagdPtStruct *point = CagdPtNew();
+                            CagdPtStruct *best = CagdPtNew();
+                            CagdPtStruct *reference = CagdPtNew();
                             CAGD_CRV_EVAL_E2(offset_curve, t->Pt[0], &point->Pt[0]);
-                            points.push_back(IritPoint(point, CagdPtFree));
-                            m_offset_curve_subdivision_params[offset_curve][junction_matcher.first] = t->Pt[0];
-                            m_offset_curve_subdivision_params[next_offset_curve][junction_matcher.first] = t2->Pt[0];
+                            CAGD_CRV_EVAL_E2(next_offset_curve, t2->Pt[0], &best->Pt[0]);
+                            for (CagdPtStruct *search = intersections2->Pnext; search != nullptr;
+                                 search = search->Pnext)
+                            {
+                                CAGD_CRV_EVAL_E2(next_offset_curve, search->Pt[0], &reference->Pt[0]);
+                                if (distance(cv::Point(point->Pt[0], point->Pt[1]),
+                                             cv::Point(reference->Pt[0], reference->Pt[1])) <
+                                    distance(cv::Point(point->Pt[0], point->Pt[1]),
+                                             cv::Point(best->Pt[0], best->Pt[1])))
+                                {
+                                    t2 = search;
+                                }
+                            }
+                            CagdPtFree(point);
+                            CagdPtFree(best);
+                            CagdPtFree(reference);
+                            choosen_curve = offset_curve;
+                            choosen_next_curve = next_offset_curve;
+                            choosen_t1 = t->Pt[0];
+                            choosen_t2 = t2->Pt[0];
                             found = true;
                         }
                     }
                 }
                 CagdPtFreeList(intersections);
+                CagdPtFreeList(intersections2);
+            }
+        }
+        if (found)
+        {
+            curve_to_subdiv[choosen_curve] = choosen_t1;
+            curve_to_subdiv[choosen_next_curve] = choosen_t2;
+            curve_to_curve[choosen_curve] = choosen_next_curve;
+            curve_to_curve[choosen_next_curve] = choosen_curve;
+        }
+    }
+    std::set<CagdCrvStruct *> used;
+    for (const auto &item : curve_to_subdiv)
+    {
+        if (used.count(item.first) > 0)
+        {
+            continue;
+        }
+        CagdCrvStruct *twin = curve_to_curve[item.first];
+        CagdPtStruct *point = CagdPtNew();
+        CAGD_CRV_EVAL_E2(item.first, item.second, &point->Pt[0]);
+        m_offset_curve_subdivision_params[item.first][junction_matcher.first] = item.second;
+        if (twin)
+        {
+            m_offset_curve_subdivision_params[twin][junction_matcher.first] = curve_to_subdiv[twin];
+        }
+        points.push_back(IritPoint(point, CagdPtFree));
+        used.insert(item.first);
+        if (twin)
+        {
+            used.insert(twin);
+        }
+    }
+    for (const auto &curve : junction_matcher.second)
+    {
+        for (auto offset_curve : m_curve_to_offset_curves[curve])
+        {
+            if (used.count(offset_curve) == 0)
+            {
+                CagdPtStruct *point = CagdPtNew();
+                if (curve->Points[1][0] == m_graph[junction_matcher.first].p.x &&
+                    curve->Points[2][0] == m_graph[junction_matcher.first].p.y)
+                {
+                    CAGD_CRV_EVAL_E2(offset_curve, 0, &point->Pt[0]);
+                    m_offset_curve_subdivision_params[offset_curve][junction_matcher.first] = 0;
+                }
+                else
+                {
+                    CAGD_CRV_EVAL_E2(offset_curve, 1, &point->Pt[0]);
+                    m_offset_curve_subdivision_params[offset_curve][junction_matcher.first] = 1;
+                }
+                points.push_back(IritPoint(point, CagdPtFree));
             }
         }
     }
