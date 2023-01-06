@@ -9,7 +9,8 @@ using OffsetCurveMatcher = std::unordered_map<CagdCrvStruct *, std::vector<CagdC
 class CurvesGenerator
 {
   public:
-    CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount);
+    CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
+                    const Image &reference_image, int distance_to_boundary_threshold, double curve_density);
 
     std::vector<Curve> get_curves();
 
@@ -35,6 +36,9 @@ class CurvesGenerator
     void add_surface_from_4_points(const IritPoint &p0, const IritPoint &p1, const IritPoint &p2, const IritPoint &p3);
     void add_surface_from_2_lines(const IritPoint &line0_p0, const IritPoint &line0_p1, const IritPoint &line1_p0,
                                   const IritPoint &line1_p1);
+    int distance_to_boundary(const cv::Point &point, int maximum_distance);
+    Curve trim_curve_to_fit_boundary(const Curve &curve, const Curve &width_curve, const Curve &curve_to_trim);
+    void fix_surface_orientation(IritSurface &surface);
 
   private:
     Graph &m_graph;
@@ -50,6 +54,9 @@ class CurvesGenerator
     std::vector<IritSurface> m_surfaces;
     double m_extrusion_amount;
     std::vector<IritTV> m_extrusions;
+    const Image &m_reference_image;
+    int m_distance_to_boundary_threshold;
+    double m_curve_density;
 };
 
 #endif /* CURVES_GENERATOR_H */

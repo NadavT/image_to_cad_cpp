@@ -56,6 +56,14 @@ int main(int argc, char **argv)
         .default_value(4)
         .scan<'i', int>();
     program.add_argument("-ex", "--extrusion").help("Extrusion amount").default_value(10.0).scan<'g', double>();
+    program.add_argument("-dbt", "--distance_to_boundary_threshold")
+        .help("distance to boundary threshold")
+        .default_value(2)
+        .scan<'i', int>();
+    program.add_argument("-cd", "--curve_density")
+        .help("density of the curves (number of points per unit length of arc)")
+        .default_value(2)
+        .scan<'g', double>();
 
     try
     {
@@ -92,9 +100,11 @@ int main(int argc, char **argv)
                        program.get<double>("--junction_smooth_threshold"), preprocess_image.get_colored_image().cols,
                        preprocess_image.get_colored_image().rows),
                    "Processing graph");
-    TIMED_FUNCTION(CurvesGenerator curves_generator(process_graph.get_graph(), program.get<int>("--curve_order"),
-                                                    program.get<int>("--target_curve_order"),
-                                                    program.get<double>("--extrusion")),
+    TIMED_FUNCTION(CurvesGenerator curves_generator(
+                       process_graph.get_graph(), program.get<int>("--curve_order"),
+                       program.get<int>("--target_curve_order"), program.get<double>("--extrusion"),
+                       preprocess_image.get_colored_image(), program.get<int>("--distance_to_boundary_threshold"),
+                       program.get<double>("--curve_density")),
                    "Generating curves");
     TIMED_FUNCTION(curves_generator.write_curves("curves.itd"), "Exporting curves to file");
     TIMED_FUNCTION(curves_generator.write_offset_curves("offset_curves.itd"), "Exporting offset curves to file");
