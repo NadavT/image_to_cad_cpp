@@ -56,13 +56,21 @@ int main(int argc, char **argv)
         .default_value(4)
         .scan<'i', int>();
     program.add_argument("-ex", "--extrusion").help("Extrusion amount").default_value(10.0).scan<'g', double>();
+    program.add_argument("-dbs", "--distance_to_boundary_samples")
+        .help("distance to boundary samples")
+        .default_value(5)
+        .scan<'i', int>();
     program.add_argument("-dbt", "--distance_to_boundary_threshold")
         .help("distance to boundary threshold")
         .default_value(2)
         .scan<'i', int>();
     program.add_argument("-cd", "--curve_density")
         .help("density of the curves (number of points per unit length of arc)")
-        .default_value(2)
+        .default_value(0.1)
+        .scan<'g', double>();
+    program.add_argument("-jra", "--junction_radius_adder")
+        .help("The radius of the junctions will be increased by this value (for treaming the outgoing curves")
+        .default_value(2.0)
         .scan<'g', double>();
 
     try
@@ -103,8 +111,9 @@ int main(int argc, char **argv)
     TIMED_FUNCTION(CurvesGenerator curves_generator(
                        process_graph.get_graph(), program.get<int>("--curve_order"),
                        program.get<int>("--target_curve_order"), program.get<double>("--extrusion"),
-                       preprocess_image.get_colored_image(), program.get<int>("--distance_to_boundary_threshold"),
-                       program.get<double>("--curve_density")),
+                       preprocess_image.get_colored_image(), program.get<int>("--distance_to_boundary_samples"),
+                       program.get<int>("--distance_to_boundary_threshold"), program.get<double>("--curve_density"),
+                       program.get<double>("--junction_radius_adder")),
                    "Generating curves");
     TIMED_FUNCTION(curves_generator.write_curves("curves.itd"), "Exporting curves to file");
     TIMED_FUNCTION(curves_generator.write_offset_curves("offset_curves.itd"), "Exporting offset curves to file");
@@ -115,5 +124,6 @@ int main(int argc, char **argv)
     std::chrono::duration<double> elapsed = end - start;
     std::cout << std::endl << "Finished all in: " << elapsed.count() << " seconds" << std::endl;
 
+    exit(0);
     return 0;
 }

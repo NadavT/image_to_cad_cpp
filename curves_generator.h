@@ -6,11 +6,15 @@
 using OffsetCurveDetails = std::tuple<Curve, std::vector<VertexDescriptor>>;
 using OffsetCurveMatcher = std::unordered_map<CagdCrvStruct *, std::vector<CagdCrvStruct *>>;
 
+using ImageGraph = boost::adjacency_list<boost::setS, boost::vecS, boost::bidirectionalS, cv::Point,
+                                         boost::property<boost::edge_weight_t, float>>;
+
 class CurvesGenerator
 {
   public:
     CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
-                    const Image &reference_image, int distance_to_boundary_threshold, double curve_density);
+                    const Image &reference_image, int distance_to_boundary_samples, int distance_to_boundary_threshold,
+                    double curve_density, double junction_radius_adder);
 
     std::vector<Curve> get_curves();
 
@@ -20,6 +24,7 @@ class CurvesGenerator
     void write_extrusions(const std::string &filename);
 
   private:
+    void generate_image_graph();
     void generate_curves();
     void decrease_curves_order();
     void generate_offset_curves();
@@ -37,6 +42,8 @@ class CurvesGenerator
     void add_surface_from_2_lines(const IritPoint &line0_p0, const IritPoint &line0_p1, const IritPoint &line1_p0,
                                   const IritPoint &line1_p1);
     int distance_to_boundary(const cv::Point &point, int maximum_distance);
+    cv::Point closest_point_on_boundary(const cv::Point &point, int maximum_distance);
+    int distance_in_boundary(const cv::Point &p0, const cv::Point &p1);
     Curve trim_curve_to_fit_boundary(const Curve &curve, const Curve &width_curve, const Curve &curve_to_trim);
     void fix_surface_orientation(IritSurface &surface);
 
@@ -55,8 +62,12 @@ class CurvesGenerator
     double m_extrusion_amount;
     std::vector<IritTV> m_extrusions;
     const Image &m_reference_image;
+    int m_distance_to_boundary_samples;
     int m_distance_to_boundary_threshold;
     double m_curve_density;
+    ImageGraph m_image_graph;
+    VertexDescriptorMap m_image_graph_map;
+    double m_junction_radius_adder;
 };
 
 #endif /* CURVES_GENERATOR_H */

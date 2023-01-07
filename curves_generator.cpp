@@ -9,8 +9,12 @@
 #include <inc_irit/cagd_lib.h>
 #include <inc_irit/iritprsr.h>
 
+#include <boost/graph/breadth_first_search.hpp>
+#include <boost/graph/johnson_all_pairs_shortest.hpp>
+
 CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
-                                 const Image &reference_image, int distance_to_boundary_threshold, double curve_density)
+                                 const Image &reference_image, int distance_to_boundary_samples,
+                                 int distance_to_boundary_threshold, double curve_density, double junction_radius_adder)
     : m_graph(graph)
     , m_curves()
     , m_max_order(max_order)
@@ -18,8 +22,10 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     , m_offset_curves()
     , m_extrusion_amount(extrusion_amount)
     , m_reference_image(reference_image)
+    , m_distance_to_boundary_samples(distance_to_boundary_samples)
     , m_distance_to_boundary_threshold(distance_to_boundary_threshold)
     , m_curve_density(curve_density)
+    , m_junction_radius_adder(junction_radius_adder)
 {
     if (max_order == -1)
     {
@@ -29,6 +35,8 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     {
         m_target_order = m_max_order;
     }
+
+    TIMED_INNER_FUNCTION(generate_image_graph(), "Generating image graph");
     TIMED_INNER_FUNCTION(generate_curves(), "Generating curves");
     TIMED_INNER_FUNCTION(decrease_curves_order(), "Decrease curves order");
     TIMED_INNER_FUNCTION(generate_offset_curves(), "Generating offset curves");
@@ -79,6 +87,65 @@ void CurvesGenerator::write_extrusions(const std::string &filename)
         TrivTVWriteToFile2(extrusion.get(), handler, 4, nullptr, &error);
     }
     IPCloseStream(handler, TRUE);
+}
+
+void CurvesGenerator::generate_image_graph()
+{
+    std::cout << "\t\tFinished " << 0 << " colums out of " << m_reference_image.cols << std::endl;
+    for (int i = 0; i < m_reference_image.cols; i++)
+    {
+        for (int j = 0; j < m_reference_image.rows; j++)
+        {
+            if (m_reference_image.at<cv::Vec3b>({i, j})[2] >= 120)
+            {
+                continue;
+            }
+            cv::Point p(i, j);
+            for (int inner_i = std::max(i - 1, 0); inner_i <= std::min(i + 1, m_reference_image.cols - 1); inner_i++)
+            {
+                for (int inner_j = std::max(j - 1, 0); inner_j <= std::min(j + 1, m_reference_image.rows - 1);
+                     inner_j++)
+                {
+                    if (m_reference_image.at<cv::Vec3b>({i, j})[2] >= 120 || (inner_i == i && inner_j == j))
+                    {
+                        continue;
+                    }
+                    cv::Point inner_p(inner_i, inner_j);
+                    ImageGraph::vertex_descriptor v1;
+                    if (m_image_graph_map.count(p) == 0)
+                    {
+                        v1 = boost::add_vertex(p, m_image_graph);
+                        m_image_graph_map[p] = v1;
+                    }
+                    else
+                    {
+                        v1 = m_image_graph_map[p];
+                    }
+                    ImageGraph::vertex_descriptor v2;
+                    if (m_image_graph_map.count(inner_p) == 0)
+                    {
+                        v2 = boost::add_vertex(inner_p, m_image_graph);
+                        m_image_graph_map[inner_p] = v2;
+                    }
+                    else
+                    {
+                        v2 = m_image_graph_map[inner_p];
+                    }
+
+                    boost::add_edge(v1, v2, m_image_graph);
+                }
+            }
+        }
+        std::cout << "\x1b[A";
+        std::cout << "\t\tFinished " << i << " columns out of " << m_reference_image.cols << std::endl;
+    }
+    std::cout << "Image graph has " << boost::num_vertices(m_image_graph) << " vertices and "
+              << boost::num_edges(m_image_graph) << " edges" << std::endl;
+
+    std::vector<size_t> distances(boost::num_vertices(m_image_graph));
+    auto recorder = boost::record_distances(distances.data(), boost::on_tree_edge{});
+
+    boost::breadth_first_search(m_image_graph, 0, boost::visitor(boost::make_bfs_visitor(recorder)));
 }
 
 void CurvesGenerator::generate_curves()
@@ -265,38 +332,78 @@ void CurvesGenerator::generate_offset_curves()
             trim_curve_to_fit_boundary(curve, opposite_width_curve, opposite_offset_curve);
 
         CagdPtStruct *point = CagdPtNew();
-        CAGD_CRV_EVAL_E2(new_offset_curve.get(), 0, &point->Pt[0]);
-        cv::Point p0(point->Pt[0], point->Pt[1]);
-        CAGD_CRV_EVAL_E2(new_offset_curve.get(), 1, &point->Pt[0]);
-        cv::Point p1(point->Pt[0], point->Pt[1]);
-        CAGD_CRV_EVAL_E2(new_offset_curve.get(), 0.5, &point->Pt[0]);
-        cv::Point p2(point->Pt[0], point->Pt[1]);
-        CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), 0, &point->Pt[0]);
-        cv::Point p3(point->Pt[0], point->Pt[1]);
-        CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), 1, &point->Pt[0]);
-        cv::Point p4(point->Pt[0], point->Pt[1]);
-        CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), 0.5, &point->Pt[0]);
-        cv::Point p5(point->Pt[0], point->Pt[1]);
-        CagdPtFree(point);
+        double max_distance_offset_curve = 0;
+        double min_distance_offset_curve = std::numeric_limits<double>::max();
+        double max_distance_opposite_curve = 0;
+        double min_distance_opposite_curve = std::numeric_limits<double>::max();
+        for (int i = 0; i < m_distance_to_boundary_samples; i++)
+        {
+            CAGD_CRV_EVAL_E2(new_offset_curve.get(), static_cast<double>(i) / (m_distance_to_boundary_samples - 1),
+                             &point->Pt[0]);
+            cv::Point p(point->Pt[0], point->Pt[1]);
+            double distance = distance_to_boundary(p, m_distance_to_boundary_threshold * 2);
+            if (distance > max_distance_offset_curve)
+            {
+                max_distance_offset_curve = distance;
+            }
+            if (distance < min_distance_opposite_curve)
+            {
+                min_distance_opposite_curve = distance;
+            }
+            CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(),
+                             static_cast<double>(i) / (m_distance_to_boundary_samples - 1), &point->Pt[0]);
+            cv::Point p2(point->Pt[0], point->Pt[1]);
+            distance = distance_to_boundary(p2, m_distance_to_boundary_threshold * 2);
+            if (distance > max_distance_opposite_curve)
+            {
+                max_distance_opposite_curve = distance;
+            }
+            if (distance < min_distance_opposite_curve)
+            {
+                min_distance_opposite_curve = distance;
+            }
+        }
 
-        double diff1 = std::abs(distance_to_boundary(p2, m_distance_to_boundary_threshold * 2) -
-                                distance_to_boundary(p0, m_distance_to_boundary_threshold));
-        double diff2 = std::abs(distance_to_boundary(p2, m_distance_to_boundary_threshold * 2) -
-                                distance_to_boundary(p1, m_distance_to_boundary_threshold));
-        double diff3 = std::abs(distance_to_boundary(p5, m_distance_to_boundary_threshold * 2) -
-                                distance_to_boundary(p3, m_distance_to_boundary_threshold));
-        double diff4 = std::abs(distance_to_boundary(p5, m_distance_to_boundary_threshold * 2) -
-                                distance_to_boundary(p4, m_distance_to_boundary_threshold));
-        double max_diff = std::max({diff1, diff2, diff3, diff4});
-        double curve_length = CagdCrvArcLenPoly(curve.get()) / 2;
+        CAGD_CRV_EVAL_E2(new_offset_curve.get(), 0.1, &point->Pt[0]);
+        cv::Point p0(point->Pt[0], point->Pt[1]);
+        CAGD_CRV_EVAL_E2(new_offset_curve.get(), 0.9, &point->Pt[0]);
+        cv::Point p1(point->Pt[0], point->Pt[1]);
+        // CAGD_CRV_EVAL_E2(new_offset_curve.get(), 0.5, &point->Pt[0]);
+        // cv::Point p2(point->Pt[0], point->Pt[1]);
+        CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), 0.1, &point->Pt[0]);
+        cv::Point p3(point->Pt[0], point->Pt[1]);
+        CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), 0.9, &point->Pt[0]);
+        cv::Point p4(point->Pt[0], point->Pt[1]);
+        // CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), 0.5, &point->Pt[0]);
+        // cv::Point p5(point->Pt[0], point->Pt[1]);
+        // CagdPtFree(point);
+
+        // double diff1 = std::abs(distance_to_boundary(p2, m_distance_to_boundary_threshold * 2) -
+        //                         distance_to_boundary(p0, m_distance_to_boundary_threshold));
+        // double diff2 = std::abs(distance_to_boundary(p2, m_distance_to_boundary_threshold * 2) -
+        //                         distance_to_boundary(p1, m_distance_to_boundary_threshold));
+        // double diff3 = std::abs(distance_to_boundary(p5, m_distance_to_boundary_threshold * 2) -
+        //                         distance_to_boundary(p3, m_distance_to_boundary_threshold));
+        // double diff4 = std::abs(distance_to_boundary(p5, m_distance_to_boundary_threshold * 2) -
+        //                         distance_to_boundary(p4, m_distance_to_boundary_threshold));
+        double max_diff = std::max(
+            {(max_distance_offset_curve - min_distance_offset_curve) / CagdCrvArcLenPoly(new_offset_curve.get()),
+             (max_distance_opposite_curve - min_distance_opposite_curve) /
+                 CagdCrvArcLenPoly(new_opposite_offset_curve.get())});
+
+        double offset_curve_length = CagdCrvArcLenPoly(new_offset_curve.get());
+        double opposite_offset_curve_length = CagdCrvArcLenPoly(new_opposite_offset_curve.get());
 
         lock.lock();
         if (junctions.size() < 2 ||
-            (distance_to_boundary(p0, m_distance_to_boundary_threshold) < m_distance_to_boundary_threshold &&
-             distance_to_boundary(p1, m_distance_to_boundary_threshold) < m_distance_to_boundary_threshold &&
-             distance_to_boundary(p3, m_distance_to_boundary_threshold) < m_distance_to_boundary_threshold &&
-             distance_to_boundary(p4, m_distance_to_boundary_threshold) < m_distance_to_boundary_threshold &&
-             max_diff / curve_length < 0.1))
+            (max_distance_offset_curve < m_distance_to_boundary_threshold &&
+             max_distance_opposite_curve < m_distance_to_boundary_threshold && max_diff < 0.1 &&
+             distance_in_boundary(closest_point_on_boundary(p0, m_distance_to_boundary_threshold),
+                                  closest_point_on_boundary(p1, m_distance_to_boundary_threshold)) <
+                 1000 * offset_curve_length &&
+             distance_in_boundary(closest_point_on_boundary(p3, m_distance_to_boundary_threshold),
+                                  closest_point_on_boundary(p4, m_distance_to_boundary_threshold)) <
+                 1000 * opposite_offset_curve_length))
         {
             m_offset_curves.push_back({std::move(new_offset_curve), junctions});
             m_offset_curves.push_back({std::move(new_opposite_offset_curve), junctions});
@@ -306,7 +413,8 @@ void CurvesGenerator::generate_offset_curves()
             {
                 m_junction_to_curves[junction].push_back(curve.get());
                 // m_junction_to_curves[junction].push_back(std::get<0>(m_offset_curves.back()).get());
-                // m_junction_to_curves[junction].push_back(std::get<0>(*std::prev(m_offset_curves.end(), 2)).get());
+                // m_junction_to_curves[junction].push_back(std::get<0>(*std::prev(m_offset_curves.end(),
+                // 2)).get());
             }
         }
         i++;
@@ -800,15 +908,64 @@ int CurvesGenerator::distance_to_boundary(const cv::Point &point, int maximum_di
     return maximum_distance;
 }
 
+cv::Point CurvesGenerator::closest_point_on_boundary(const cv::Point &point, int maximum_distance)
+{
+    for (int radius = 0; radius < maximum_distance; radius++)
+    {
+        for (int i = std::max(point.x - radius, 0); i <= std::min(point.x + radius, m_reference_image.cols - 1); i++)
+        {
+            for (int j = std::max(point.y - radius, 0); j <= std::min(point.y + radius, m_reference_image.rows - 1);
+                 j++)
+            {
+                if (m_reference_image.at<cv::Vec3b>({i, j})[2] < 120)
+                {
+                    return {i, j};
+                }
+            }
+        }
+    }
+
+    return {-1, -1};
+}
+
+int CurvesGenerator::distance_in_boundary(const cv::Point &p0, const cv::Point &p1)
+{
+    if (p0 == p1)
+    {
+        return 0;
+    }
+
+    if (m_image_graph_map.find(p0) == m_image_graph_map.end())
+    {
+        std::cerr << "p0 is not in the graph" << std::endl;
+        return std::numeric_limits<int>::max();
+    }
+    if (m_image_graph_map.find(p1) == m_image_graph_map.end())
+    {
+        std::cerr << "p1 is not in the graph" << std::endl;
+        return std::numeric_limits<int>::max();
+    }
+
+    auto source = m_image_graph_map[p0];
+    auto target = m_image_graph_map[p1];
+
+    std::vector<int> distances(boost::num_vertices(m_image_graph), std::numeric_limits<int>::max());
+    auto recorder = boost::record_distances(distances.data(), boost::on_tree_edge{});
+
+    boost::breadth_first_search(m_image_graph, source, boost::visitor(boost::make_bfs_visitor(recorder)));
+
+    return distances.at(target);
+}
+
 Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curve &width_curve,
                                                   const Curve &curve_to_trim)
 {
     double start_point = 0;
     double end_point = 1;
     cv::Point junction0(curve->Points[1][0], curve->Points[2][0]);
-    double junction0_radius = std::abs(width_curve->Points[1][0]) + 2;
+    double junction0_radius = std::abs(width_curve->Points[1][0]) + m_junction_radius_adder;
     cv::Point junction1(curve->Points[1][curve->Length - 1], curve->Points[2][curve->Length - 1]);
-    double junction1_radius = std::abs(width_curve->Points[1][width_curve->Length - 1]) + 2;
+    double junction1_radius = std::abs(width_curve->Points[1][width_curve->Length - 1]) + m_junction_radius_adder;
     double curve_length = CagdCrvArcLenPoly(curve.get());
     for (double i = 0; i < 0.5; i += 1 / curve_length)
     {
