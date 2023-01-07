@@ -92,6 +92,8 @@ void CurvesGenerator::write_extrusions(const std::string &filename)
 void CurvesGenerator::generate_image_graph()
 {
     std::cout << "\t\tFinished " << 0 << " colums out of " << m_reference_image.cols << std::endl;
+    m_image_graph.m_vertices.reserve(m_reference_image.cols * m_reference_image.rows);
+    m_image_graph_map.reserve(m_reference_image.cols * m_reference_image.rows);
     for (int i = 0; i < m_reference_image.cols; i++)
     {
         for (int j = 0; j < m_reference_image.rows; j++)
