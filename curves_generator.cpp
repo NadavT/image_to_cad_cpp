@@ -14,7 +14,8 @@
 
 CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
                                  const Image &reference_image, int distance_to_boundary_samples,
-                                 int distance_to_boundary_threshold, double curve_density, double junction_radius_adder)
+                                 int distance_to_boundary_threshold, double distance_in_boundary_factor,
+                                 double curve_density, double junction_radius_adder)
     : m_graph(graph)
     , m_curves()
     , m_max_order(max_order)
@@ -24,6 +25,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     , m_reference_image(reference_image)
     , m_distance_to_boundary_samples(distance_to_boundary_samples)
     , m_distance_to_boundary_threshold(distance_to_boundary_threshold)
+    , m_distance_in_boundary_factor(distance_in_boundary_factor)
     , m_curve_density(curve_density)
     , m_junction_radius_adder(junction_radius_adder)
 {
@@ -402,10 +404,10 @@ void CurvesGenerator::generate_offset_curves()
              max_distance_opposite_curve < m_distance_to_boundary_threshold && max_diff < 0.1 &&
              distance_in_boundary(closest_point_on_boundary(p0, m_distance_to_boundary_threshold),
                                   closest_point_on_boundary(p1, m_distance_to_boundary_threshold)) <
-                 1000 * offset_curve_length &&
+                 m_distance_in_boundary_factor * offset_curve_length &&
              distance_in_boundary(closest_point_on_boundary(p3, m_distance_to_boundary_threshold),
                                   closest_point_on_boundary(p4, m_distance_to_boundary_threshold)) <
-                 1000 * opposite_offset_curve_length))
+                 m_distance_in_boundary_factor * opposite_offset_curve_length))
         {
             m_offset_curves.push_back({std::move(new_offset_curve), junctions});
             m_offset_curves.push_back({std::move(new_opposite_offset_curve), junctions});
