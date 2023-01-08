@@ -14,8 +14,8 @@
 
 CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
                                  const Image &reference_image, int distance_to_boundary_samples,
-                                 int distance_to_boundary_threshold, double distance_in_boundary_factor,
-                                 double curve_density, double junction_radius_adder)
+                                 int distance_to_boundary_threshold, double distance_in_boundary_backoff,
+                                 double distance_in_boundary_factor, double curve_density, double junction_radius_adder)
     : m_graph(graph)
     , m_curves()
     , m_max_order(max_order)
@@ -25,6 +25,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     , m_reference_image(reference_image)
     , m_distance_to_boundary_samples(distance_to_boundary_samples)
     , m_distance_to_boundary_threshold(distance_to_boundary_threshold)
+    , m_distance_in_boundary_backoff(distance_in_boundary_backoff)
     , m_distance_in_boundary_factor(distance_in_boundary_factor)
     , m_curve_density(curve_density)
     , m_junction_radius_adder(junction_radius_adder)
@@ -368,9 +369,9 @@ void CurvesGenerator::generate_offset_curves()
             }
         }
 
-        CAGD_CRV_EVAL_E2(new_offset_curve.get(), 0.1, &point->Pt[0]);
+        CAGD_CRV_EVAL_E2(new_offset_curve.get(), m_distance_in_boundary_backoff, &point->Pt[0]);
         cv::Point p0(point->Pt[0], point->Pt[1]);
-        CAGD_CRV_EVAL_E2(new_offset_curve.get(), 0.9, &point->Pt[0]);
+        CAGD_CRV_EVAL_E2(new_offset_curve.get(), 1 - m_distance_in_boundary_backoff, &point->Pt[0]);
         cv::Point p1(point->Pt[0], point->Pt[1]);
         // CAGD_CRV_EVAL_E2(new_offset_curve.get(), 0.5, &point->Pt[0]);
         // cv::Point p2(point->Pt[0], point->Pt[1]);

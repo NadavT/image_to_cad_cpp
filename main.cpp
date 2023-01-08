@@ -64,6 +64,10 @@ int main(int argc, char **argv)
         .help("distance to boundary threshold")
         .default_value(2)
         .scan<'i', int>();
+    program.add_argument("-dbb", "--distance_in_boundary_backoff")
+        .help("distance in boundary backoff")
+        .default_value(0.1)
+        .scan<'g', double>();
     program.add_argument("-dbf", "--distance_in_boundary_factor")
         .help("distance in boundary factor")
         .default_value(10.0)
@@ -112,14 +116,14 @@ int main(int argc, char **argv)
                        program.get<double>("--junction_smooth_threshold"), preprocess_image.get_colored_image().cols,
                        preprocess_image.get_colored_image().rows),
                    "Processing graph");
-    TIMED_FUNCTION(CurvesGenerator curves_generator(
-                       process_graph.get_graph(), program.get<int>("--curve_order"),
-                       program.get<int>("--target_curve_order"), program.get<double>("--extrusion"),
-                       preprocess_image.get_colored_image(), program.get<int>("--distance_to_boundary_samples"),
-                       program.get<int>("--distance_to_boundary_threshold"),
-                       program.get<double>("--distance_in_boundary_factor"), program.get<double>("--curve_density"),
-                       program.get<double>("--junction_radius_adder")),
-                   "Generating curves");
+    TIMED_FUNCTION(
+        CurvesGenerator curves_generator(
+            process_graph.get_graph(), program.get<int>("--curve_order"), program.get<int>("--target_curve_order"),
+            program.get<double>("--extrusion"), preprocess_image.get_colored_image(),
+            program.get<int>("--distance_to_boundary_samples"), program.get<int>("--distance_to_boundary_threshold"),
+            program.get<double>("--distance_in_boundary_backoff"), program.get<double>("--distance_in_boundary_factor"),
+            program.get<double>("--curve_density"), program.get<double>("--junction_radius_adder")),
+        "Generating curves");
     TIMED_FUNCTION(curves_generator.write_curves("curves.itd"), "Exporting curves to file");
     TIMED_FUNCTION(curves_generator.write_offset_curves("offset_curves.itd"), "Exporting offset curves to file");
     TIMED_FUNCTION(curves_generator.write_surfaces("surfaces.itd"), "Exporting surfaces to file");
