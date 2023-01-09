@@ -15,7 +15,8 @@
 CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
                                  const Image &reference_image, int distance_to_boundary_samples,
                                  int distance_to_boundary_threshold, double distance_in_boundary_backoff,
-                                 double distance_in_boundary_factor, double curve_density, double junction_radius_adder)
+                                 double distance_in_boundary_factor, double curve_density, int min_curve_length,
+                                 double junction_radius_adder)
     : m_graph(graph)
     , m_curves()
     , m_max_order(max_order)
@@ -28,6 +29,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     , m_distance_in_boundary_backoff(distance_in_boundary_backoff)
     , m_distance_in_boundary_factor(distance_in_boundary_factor)
     , m_curve_density(curve_density)
+    , m_min_curve_length(min_curve_length)
     , m_junction_radius_adder(junction_radius_adder)
 {
     if (max_order == -1)
@@ -240,6 +242,10 @@ void CurvesGenerator::decrease_curves_order()
         if (m_target_order != m_max_order || length / arc_len > m_curve_density)
         {
             int final_length = std::ceil(arc_len * m_curve_density);
+            if (final_length < m_min_curve_length)
+            {
+                final_length = m_min_curve_length;
+            }
             int final_order = (final_length > m_target_order - 1) ? m_target_order : final_length;
             Curve curve = Curve(BspCrvNew(final_length, final_order, CAGD_PT_E2_TYPE), CagdCrvFree);
             Curve width_curve = Curve(BspCrvNew(final_length, final_order, CAGD_PT_E1_TYPE), CagdCrvFree);

@@ -15,7 +15,7 @@ class CurvesGenerator
     CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
                     const Image &reference_image, int distance_to_boundary_samples, int distance_to_boundary_threshold,
                     double distance_in_boundary_backoff, double distance_in_boundary_factor, double curve_density,
-                    double junction_radius_adder);
+                    int min_curve_length, double junction_radius_adder);
 
     std::vector<Curve> get_curves();
 
@@ -68,6 +68,7 @@ class CurvesGenerator
     double m_distance_in_boundary_backoff;
     double m_distance_in_boundary_factor;
     double m_curve_density;
+    int m_min_curve_length;
     ImageGraph m_image_graph;
     VertexDescriptorMap m_image_graph_map;
     double m_junction_radius_adder;
