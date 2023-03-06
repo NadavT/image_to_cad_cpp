@@ -5,7 +5,7 @@
 
 ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordered_set<Segment> &added_edges,
                            double reduction_proximity, double hanging_threshold, double junction_collapse_threshold,
-                           double junction_smooth_threshold, int width, int height)
+                           double junction_smooth_threshold, int width, int height, bool add_border)
     : m_graph(graph)
     , m_vertex_descriptor_map(map)
     , m_added_edges(added_edges)
@@ -14,6 +14,11 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
     , m_junction_collapse_threshold(junction_collapse_threshold)
     , m_junction_smooth_threshold(junction_smooth_threshold)
 {
+    if (add_border)
+    {
+        TIMED_INNER_FUNCTION(remove_border(width, height), "Removing border from graph");
+    }
+
     TIMED_INNER_FUNCTION(reduce(m_reduction_proximity), "Reducing graph");
     cv::Mat image_graph(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
 
@@ -44,6 +49,20 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
     }
 
     cv::imwrite("final_graph_processing.png", image_graph);
+}
+
+void ProcessGraph::remove_border(int width, int height)
+{
+    // Iterate over all vertices
+    auto vertices = boost::vertices(m_graph);
+    for (auto it = vertices.first; it != vertices.second; ++it)
+    {
+        Vertex &vertex = m_graph[*it];
+        if (vertex.p.x <= 8 || vertex.p.y <= 8 || vertex.p.x >= width - 9 || vertex.p.y >= height - 9)
+        {
+            boost::clear_vertex(*it, m_graph);
+        }
+    }
 }
 
 void ProcessGraph::reduce(double reduction_proximity)
@@ -159,7 +178,7 @@ void ProcessGraph::remove_hanging()
         }
         m_graph = new_graph;
 
-        cv::Mat image_graph(2000, 4000, CV_8UC3, cv::Scalar(255, 255, 255));
+        cv::Mat image_graph(2016, 4016, CV_8UC3, cv::Scalar(255, 255, 255));
 
         auto edges = boost::edges(m_graph);
 
