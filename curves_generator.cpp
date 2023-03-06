@@ -139,7 +139,14 @@ void CurvesGenerator::generate_image_graph()
                         v2 = m_image_graph_map[inner_p];
                     }
 
-                    boost::add_edge(v1, v2, m_image_graph);
+                    if (inner_i != i && inner_j != j)
+                    {
+                        boost::add_edge(v1, v2, std::sqrt(2), m_image_graph);
+                    }
+                    else
+                    {
+                        boost::add_edge(v1, v2, 1, m_image_graph);
+                    }
                 }
             }
         }
@@ -148,11 +155,6 @@ void CurvesGenerator::generate_image_graph()
     }
     std::cout << "Image graph has " << boost::num_vertices(m_image_graph) << " vertices and "
               << boost::num_edges(m_image_graph) << " edges" << std::endl;
-
-    std::vector<size_t> distances(boost::num_vertices(m_image_graph));
-    auto recorder = boost::record_distances(distances.data(), boost::on_tree_edge{});
-
-    boost::breadth_first_search(m_image_graph, 0, boost::visitor(boost::make_bfs_visitor(recorder)));
 }
 
 void CurvesGenerator::generate_curves()
@@ -409,9 +411,15 @@ void CurvesGenerator::generate_offset_curves()
         if (junctions.size() < 2 ||
             (max_distance_offset_curve < m_distance_to_boundary_threshold &&
              max_distance_opposite_curve < m_distance_to_boundary_threshold && max_diff < 0.1 &&
+             offset_curve_length / 2 <
+                 distance_in_boundary(closest_point_on_boundary(p0, m_distance_to_boundary_threshold),
+                                      closest_point_on_boundary(p1, m_distance_to_boundary_threshold)) &&
              distance_in_boundary(closest_point_on_boundary(p0, m_distance_to_boundary_threshold),
                                   closest_point_on_boundary(p1, m_distance_to_boundary_threshold)) <
                  m_distance_in_boundary_factor * offset_curve_length &&
+             opposite_offset_curve_length / 2 <
+                 distance_in_boundary(closest_point_on_boundary(p3, m_distance_to_boundary_threshold),
+                                      closest_point_on_boundary(p4, m_distance_to_boundary_threshold)) &&
              distance_in_boundary(closest_point_on_boundary(p3, m_distance_to_boundary_threshold),
                                   closest_point_on_boundary(p4, m_distance_to_boundary_threshold)) <
                  m_distance_in_boundary_factor * opposite_offset_curve_length))
@@ -817,8 +825,8 @@ std::vector<IritPoint> CurvesGenerator::get_intersection_points(
             if (used.count(offset_curve) == 0)
             {
                 CagdPtStruct *point = CagdPtNew();
-                if (curve->Points[1][0] == m_graph[junction_matcher.first].p.x &&
-                    curve->Points[2][0] == m_graph[junction_matcher.first].p.y)
+                if (std::abs(curve->Points[1][0] - m_graph[junction_matcher.first].p.x) < 1 &&
+                    std::abs(curve->Points[2][0] - m_graph[junction_matcher.first].p.y) < 1)
                 {
                     CAGD_CRV_EVAL_E2(offset_curve, 0, &point->Pt[0]);
                     m_offset_curve_subdivision_params[offset_curve][junction_matcher.first] = 0;
@@ -960,12 +968,19 @@ int CurvesGenerator::distance_in_boundary(const cv::Point &p0, const cv::Point &
     auto source = m_image_graph_map[p0];
     auto target = m_image_graph_map[p1];
 
-    std::vector<int> distances(boost::num_vertices(m_image_graph), std::numeric_limits<int>::max());
+    std::vector<int> distances(boost::num_vertices(m_image_graph));
     auto recorder = boost::record_distances(distances.data(), boost::on_tree_edge{});
+
+    std::vector<VertexDescriptor> p(boost::num_vertices(m_image_graph));
+    std::vector<double> d(boost::num_vertices(m_image_graph));
+
+    boost::dijkstra_shortest_paths(m_image_graph, source, boost::predecessor_map(&p[0]).distance_map(&d[0]));
+
+    return d[target] != 0 ? d[target] : std::numeric_limits<int>::max();
 
     boost::breadth_first_search(m_image_graph, source, boost::visitor(boost::make_bfs_visitor(recorder)));
 
-    return distances.at(target);
+    return distances.at(target) != 0 ? distances.at(target) : std::numeric_limits<int>::max();
 }
 
 Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curve &width_curve,
