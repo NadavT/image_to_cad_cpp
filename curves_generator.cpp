@@ -249,31 +249,70 @@ void CurvesGenerator::decrease_curves_order()
                 final_length = m_min_curve_length;
             }
             int final_order = (final_length > m_target_order - 1) ? m_target_order : final_length;
-            Curve curve = Curve(BspCrvNew(final_length, final_order, CAGD_PT_E2_TYPE), CagdCrvFree);
-            Curve width_curve = Curve(BspCrvNew(final_length, final_order, CAGD_PT_E1_TYPE), CagdCrvFree);
-            Curve opposite_width_curve = Curve(BspCrvNew(final_length, final_order, CAGD_PT_E1_TYPE), CagdCrvFree);
-            Curve height_curve = Curve(BspCrvNew(final_length, final_order, CAGD_PT_E3_TYPE), CagdCrvFree);
-            BspKnotUniformOpen(final_length, final_order, curve->KnotVector);
-            BspKnotUniformOpen(final_length, final_order, width_curve->KnotVector);
-            BspKnotUniformOpen(final_length, final_order, opposite_width_curve->KnotVector);
-            BspKnotUniformOpen(final_length, final_order, height_curve->KnotVector);
-            for (int j = 0; j < final_length; ++j)
+            std::unique_ptr<CagdPType[]> curve_points =
+                std::make_unique<CagdPType[]>(sizeof(CagdPType) * original_curve->Length);
+            std::unique_ptr<CagdPType[]> width_curve_points =
+                std::make_unique<CagdPType[]>(sizeof(CagdPType) * original_width_curve->Length);
+            std::unique_ptr<CagdPType[]> opposite_width_curve_points =
+                std::make_unique<CagdPType[]>(sizeof(CagdPType) * original_opposite_width_curve->Length);
+            std::unique_ptr<CagdPType[]> height_curve_points =
+                std::make_unique<CagdPType[]>(sizeof(CagdPType) * original_curve->Length);
+            for (int j = 0; j < original_curve->Length; j++)
             {
-                CagdPtStruct *point = CagdPtNew();
-                CAGD_CRV_EVAL_E2(original_curve.get(), static_cast<CagdRType>(j) / (final_length - 1), &point->Pt[0]);
-                curve->Points[1][j] = point->Pt[0];
-                curve->Points[2][j] = point->Pt[1];
-                CAGD_CRV_EVAL_SCALAR(original_width_curve.get(), static_cast<CagdRType>(j) / (final_length - 1),
-                                     width_curve->Points[1][j]);
-                CAGD_CRV_EVAL_SCALAR(original_opposite_width_curve.get(),
-                                     static_cast<CagdRType>(j) / (final_length - 1),
-                                     opposite_width_curve->Points[1][j]);
-
-                height_curve->Points[1][j] = curve->Points[1][j];
-                height_curve->Points[2][j] = curve->Points[2][j];
-                height_curve->Points[3][j] = width_curve->Points[1][j];
-                CagdPtFree(point);
+                CagdPType curve_point;
+                curve_points[j][0] = original_curve->Points[1][j];
+                curve_points[j][1] = original_curve->Points[2][j];
+                curve_points[j][2] = 0;
+                width_curve_points[j][0] = original_width_curve->Points[1][j];
+                width_curve_points[j][1] = 0;
+                width_curve_points[j][2] = 0;
+                opposite_width_curve_points[j][0] = original_opposite_width_curve->Points[1][j];
+                opposite_width_curve_points[j][1] = 0;
+                opposite_width_curve_points[j][2] = 0;
+                height_curve_points[j][0] = original_curve->Points[1][j];
+                height_curve_points[j][1] = original_curve->Points[2][j];
+                height_curve_points[j][2] = 0; // original_width_curve->Points[1][j];
             }
+            Curve curve = Curve(CagdBsplineCrvFitting(curve_points.get(), original_curve->Length, final_length,
+                                                      final_order, FALSE, CAGD_SDM_FITTING, 100, 0.1, 0.005, 0.01),
+                                CagdCrvFree);
+            Curve width_curve =
+                Curve(CagdBsplineCrvFitting(width_curve_points.get(), original_width_curve->Length, final_length,
+                                            final_order, FALSE, CAGD_SDM_FITTING, 100, 0.1, 0.005, 0.01),
+                      CagdCrvFree);
+            Curve opposite_width_curve =
+                Curve(CagdBsplineCrvFitting(opposite_width_curve_points.get(), original_opposite_width_curve->Length,
+                                            final_length, final_order, FALSE, CAGD_SDM_FITTING, 100, 0.1, 0.005, 0.01),
+                      CagdCrvFree);
+            Curve height_curve =
+                Curve(CagdBsplineCrvFitting(height_curve_points.get(), original_curve->Length, final_length,
+                                            final_order, FALSE, CAGD_SDM_FITTING, 100, 0.1, 0.005, 0.01),
+                      CagdCrvFree);
+
+            // Curve curve = Curve(BspCrvNew(final_length, final_order, CAGD_PT_E2_TYPE), CagdCrvFree);
+            // Curve width_curve = Curve(BspCrvNew(final_length, final_order, CAGD_PT_E1_TYPE), CagdCrvFree);
+            // Curve opposite_width_curve = Curve(BspCrvNew(final_length, final_order, CAGD_PT_E1_TYPE), CagdCrvFree);
+            // Curve height_curve = Curve(BspCrvNew(final_length, final_order, CAGD_PT_E3_TYPE), CagdCrvFree);
+            // BspKnotUniformOpen(final_length, final_order, curve->KnotVector);
+            // BspKnotUniformOpen(final_length, final_order, width_curve->KnotVector);
+            // BspKnotUniformOpen(final_length, final_order, opposite_width_curve->KnotVector);
+            // BspKnotUniformOpen(final_length, final_order, height_curve->KnotVector);
+            // for (int j = 0; j < final_length; ++j)
+            // {
+            //     CagdPtStruct *point = CagdPtNew();
+            //     CAGD_CRV_EVAL_E2(original_curve.get(), static_cast<CagdRType>(j) / (final_length - 1),
+            //     &point->Pt[0]); curve->Points[1][j] = point->Pt[0]; curve->Points[2][j] = point->Pt[1];
+            //     CAGD_CRV_EVAL_SCALAR(original_width_curve.get(), static_cast<CagdRType>(j) / (final_length - 1),
+            //                          width_curve->Points[1][j]);
+            //     CAGD_CRV_EVAL_SCALAR(original_opposite_width_curve.get(),
+            //                          static_cast<CagdRType>(j) / (final_length - 1),
+            //                          opposite_width_curve->Points[1][j]);
+
+            //     height_curve->Points[1][j] = curve->Points[1][j];
+            //     height_curve->Points[2][j] = curve->Points[2][j];
+            //     height_curve->Points[3][j] = width_curve->Points[1][j];
+            //     CagdPtFree(point);
+            // }
             final_curve = std::move(curve);
             final_width_curve = std::move(width_curve);
             final_opposite_width_curve = std::move(opposite_width_curve);
