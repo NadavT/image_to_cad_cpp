@@ -60,6 +60,7 @@ class CurvesGenerator
     std::vector<OffsetCurveDetails> m_offset_curves;
     OffsetCurveMatcher m_curve_to_offset_curves;
     std::unordered_map<VertexDescriptor, std::vector<CagdCrvStruct *>> m_junction_to_curves;
+    std::unordered_map<VertexDescriptor, unsigned int> m_marked_junctions;
     std::unordered_map<CagdCrvStruct *, std::unordered_map<VertexDescriptor, CagdRType>>
         m_offset_curve_subdivision_params;
     std::vector<IritSurface> m_surfaces;

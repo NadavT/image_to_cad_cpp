@@ -383,9 +383,9 @@ void CurvesGenerator::generate_offset_curves()
         cv::Point p1(point->Pt[0], point->Pt[1]);
         // CAGD_CRV_EVAL_E2(new_offset_curve.get(), 0.5, &point->Pt[0]);
         // cv::Point p2(point->Pt[0], point->Pt[1]);
-        CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), 0.1, &point->Pt[0]);
+        CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), m_distance_in_boundary_backoff, &point->Pt[0]);
         cv::Point p3(point->Pt[0], point->Pt[1]);
-        CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), 0.9, &point->Pt[0]);
+        CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), 1 - m_distance_in_boundary_backoff, &point->Pt[0]);
         cv::Point p4(point->Pt[0], point->Pt[1]);
         // CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), 0.5, &point->Pt[0]);
         // cv::Point p5(point->Pt[0], point->Pt[1]);
@@ -411,13 +411,13 @@ void CurvesGenerator::generate_offset_curves()
         if (junctions.size() < 2 ||
             (max_distance_offset_curve < m_distance_to_boundary_threshold &&
              max_distance_opposite_curve < m_distance_to_boundary_threshold && max_diff < 0.1 &&
-             offset_curve_length / 2 <
+             (offset_curve_length * (1 - 2 * m_distance_in_boundary_backoff)) * 0.5 <
                  distance_in_boundary(closest_point_on_boundary(p0, m_distance_to_boundary_threshold),
                                       closest_point_on_boundary(p1, m_distance_to_boundary_threshold)) &&
              distance_in_boundary(closest_point_on_boundary(p0, m_distance_to_boundary_threshold),
                                   closest_point_on_boundary(p1, m_distance_to_boundary_threshold)) <
                  m_distance_in_boundary_factor * offset_curve_length &&
-             opposite_offset_curve_length / 2 <
+             (opposite_offset_curve_length * (1 - 2 * m_distance_in_boundary_backoff)) * 0.5 <
                  distance_in_boundary(closest_point_on_boundary(p3, m_distance_to_boundary_threshold),
                                       closest_point_on_boundary(p4, m_distance_to_boundary_threshold)) &&
              distance_in_boundary(closest_point_on_boundary(p3, m_distance_to_boundary_threshold),
@@ -434,6 +434,20 @@ void CurvesGenerator::generate_offset_curves()
                 // m_junction_to_curves[junction].push_back(std::get<0>(m_offset_curves.back()).get());
                 // m_junction_to_curves[junction].push_back(std::get<0>(*std::prev(m_offset_curves.end(),
                 // 2)).get());
+            }
+        }
+        else
+        {
+            for (const auto &junction : junctions)
+            {
+                if (m_marked_junctions.count(junction) > 0)
+                {
+                    m_marked_junctions[junction]++;
+                }
+                else
+                {
+                    m_marked_junctions[junction] = 1;
+                }
             }
         }
         i++;
@@ -466,6 +480,10 @@ void CurvesGenerator::generate_surfaces_from_junctions()
             continue;
         }
         std::vector<IritPoint> points = get_intersection_points(junction_matcher);
+        if (m_marked_junctions.count(junction_matcher.first) > 0 && m_marked_junctions[junction_matcher.first] > 1)
+        {
+            continue;
+        }
         if (points.size() == 3)
         {
             IritSurface surface = IritSurface(
