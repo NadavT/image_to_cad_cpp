@@ -49,7 +49,9 @@ class CurvesGenerator
     cv::Point closest_point_on_boundary(const cv::Point &point, int maximum_distance);
     int distance_in_boundary(const cv::Point &p0, const cv::Point &p1);
     Curve trim_curve_to_fit_boundary(const Curve &curve, const Curve &width_curve, const Curve &curve_to_trim);
-    void fix_surface_orientation(IritSurface &surface);
+    void fix_surface_orientation(IritSurface &surface, bool print_error = true);
+    IritSurface generate_surface_from_pivot_and_points(const IritPoint &pivot, const IritPoint &p0, const IritPoint &p1,
+                                                       double radius);
 
   private:
     Graph &m_graph;
@@ -63,6 +65,8 @@ class CurvesGenerator
     std::unordered_map<VertexDescriptor, unsigned int> m_marked_junctions;
     std::unordered_map<CagdCrvStruct *, std::unordered_map<VertexDescriptor, CagdRType>>
         m_offset_curve_subdivision_params;
+    std::unordered_map<CagdPtStruct *, std::vector<std::tuple<CagdCrvStruct *, CagdCrvStruct *, CagdRType>>>
+        m_point_to_originating_curve;
     std::vector<IritSurface> m_surfaces;
     double m_extrusion_amount;
     std::vector<IritTV> m_extrusions;
@@ -76,6 +80,7 @@ class CurvesGenerator
     ImageGraph m_image_graph;
     ImageVertexDescriptorMap m_image_graph_map;
     double m_junction_radius_adder;
+    std::unordered_map<cv::Point, double> m_junctions_radius;
 };
 
 #endif /* CURVES_GENERATOR_H */
