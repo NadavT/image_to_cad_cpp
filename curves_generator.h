@@ -35,6 +35,7 @@ class CurvesGenerator
     void sort_junction_curves();
     void generate_surfaces_from_junctions();
     void generate_surfaces_from_curves();
+    void fill_holes();
     void extrude_surfaces();
 
     std::vector<std::pair<std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>>> split_junction_walk(
@@ -52,6 +53,9 @@ class CurvesGenerator
     void fix_surface_orientation(IritSurface &surface, bool print_error = true);
     IritSurface generate_surface_from_pivot_and_points(const IritPoint &pivot, const IritPoint &p0, const IritPoint &p1,
                                                        double radius);
+    std::set<VertexDescriptor> get_marked_neighborhood(const VertexDescriptor &junction);
+    std::set<VertexDescriptor> get_marked_neighborhood(const VertexDescriptor &junction,
+                                                       std::set<VertexDescriptor> &visited);
 
   private:
     Graph &m_graph;
@@ -62,6 +66,7 @@ class CurvesGenerator
     std::vector<OffsetCurveDetails> m_offset_curves;
     OffsetCurveMatcher m_curve_to_offset_curves;
     std::unordered_map<VertexDescriptor, std::vector<CagdCrvStruct *>> m_junction_to_curves;
+    std::set<std::pair<VertexDescriptor, VertexDescriptor>> m_connections;
     std::unordered_map<VertexDescriptor, unsigned int> m_marked_junctions;
     std::unordered_map<CagdCrvStruct *, std::unordered_map<VertexDescriptor, CagdRType>>
         m_offset_curve_subdivision_params;
