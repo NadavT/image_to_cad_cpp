@@ -420,9 +420,9 @@ void ProcessGraph::smooth_neighbors(VertexDescriptor vertex, double distance)
             {
                 VertexDescriptor neighbor = (boost::source(edge, m_graph) == vertex) ? boost::target(edge, m_graph)
                                                                                      : boost::source(edge, m_graph);
-                double neighbor_distance = m_graph[neighbor].distance_to_source;
+                // double neighbor_distance = m_graph[neighbor].distance_to_source;
                 contract_vertices(vertex, neighbor);
-                m_graph[vertex].distance_to_source = neighbor_distance;
+                // m_graph[vertex].distance_to_source = neighbor_distance;
                 changed = true;
                 break;
             }
