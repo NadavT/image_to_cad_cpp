@@ -18,7 +18,7 @@ class ProcessGraph
   private:
     void remove_border(int width, int height);
     void reduce(double reduction_proximity);
-    void remove_hanging();
+    void remove_hanging(int width, int height);
     void collapse_junctions(double junction_collapse_threshold);
     void smooth_junctions(double smooth_distance);
 

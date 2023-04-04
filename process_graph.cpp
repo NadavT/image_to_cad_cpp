@@ -33,7 +33,7 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
 
     cv::imwrite("after_reduction.png", image_graph);
 
-    TIMED_INNER_FUNCTION(remove_hanging(), "Removing hanging");
+    TIMED_INNER_FUNCTION(remove_hanging(width, height), "Removing hanging");
     TIMED_INNER_FUNCTION(collapse_junctions(m_junction_collapse_threshold), "Collapsing junctions");
     TIMED_INNER_FUNCTION(smooth_junctions(m_junction_smooth_threshold), "Smoothing junctions");
 
@@ -120,7 +120,7 @@ void ProcessGraph::reduce(double reduction_proximity)
     }
 }
 
-void ProcessGraph::remove_hanging()
+void ProcessGraph::remove_hanging(int width, int height)
 {
     bool changed = true;
     int i = 0;
@@ -178,7 +178,7 @@ void ProcessGraph::remove_hanging()
         }
         m_graph = new_graph;
 
-        cv::Mat image_graph(2016, 4016, CV_8UC3, cv::Scalar(255, 255, 255));
+        cv::Mat image_graph(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
 
         auto edges = boost::edges(m_graph);
 
