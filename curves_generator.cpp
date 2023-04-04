@@ -14,6 +14,11 @@
 
 #include <boost/graph/dijkstra_shortest_paths.hpp>
 
+static inline unsigned int point_to_index(const cv::Point &point, const int width)
+{
+    return point.y * width + point.x;
+}
+
 CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
                                  const Image &reference_image, int distance_to_boundary_samples,
                                  int distance_to_boundary_threshold, double distance_in_boundary_backoff,
@@ -32,6 +37,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     , m_distance_in_boundary_factor(distance_in_boundary_factor)
     , m_curve_density(curve_density)
     , m_min_curve_length(min_curve_length)
+    , m_image_graph(m_reference_image.cols * m_reference_image.rows)
     , m_junction_radius_adder(junction_radius_adder)
 {
     if (max_order == -1)
@@ -112,7 +118,6 @@ void CurvesGenerator::generate_image_graph()
 {
     std::cout << "\t\tFinished " << 0 << " colums out of " << m_reference_image.cols << std::endl;
     m_image_graph.m_vertices.reserve(m_reference_image.cols * m_reference_image.rows);
-    m_image_graph_map.reserve(m_reference_image.cols * m_reference_image.rows);
     for (int i = 0; i < m_reference_image.cols; i++)
     {
         for (int j = 0; j < m_reference_image.rows; j++)
@@ -132,26 +137,8 @@ void CurvesGenerator::generate_image_graph()
                         continue;
                     }
                     cv::Point inner_p(inner_i, inner_j);
-                    ImageGraph::vertex_descriptor v1;
-                    if (m_image_graph_map.count(p) == 0)
-                    {
-                        v1 = boost::add_vertex(p, m_image_graph);
-                        m_image_graph_map[p] = v1;
-                    }
-                    else
-                    {
-                        v1 = m_image_graph_map[p];
-                    }
-                    ImageGraph::vertex_descriptor v2;
-                    if (m_image_graph_map.count(inner_p) == 0)
-                    {
-                        v2 = boost::add_vertex(inner_p, m_image_graph);
-                        m_image_graph_map[inner_p] = v2;
-                    }
-                    else
-                    {
-                        v2 = m_image_graph_map[inner_p];
-                    }
+                    ImageGraph::vertex_descriptor v1 = point_to_index(p, m_reference_image.cols);
+                    ImageGraph::vertex_descriptor v2 = point_to_index(inner_p, m_reference_image.cols);
 
                     if (inner_i != i && inner_j != j)
                     {
@@ -1203,19 +1190,8 @@ int CurvesGenerator::distance_in_boundary(const cv::Point &p0, const cv::Point &
         return 0;
     }
 
-    if (m_image_graph_map.find(p0) == m_image_graph_map.end())
-    {
-        std::cerr << "p0 is not in the graph" << std::endl;
-        return std::numeric_limits<int>::max();
-    }
-    if (m_image_graph_map.find(p1) == m_image_graph_map.end())
-    {
-        std::cerr << "p1 is not in the graph" << std::endl;
-        return std::numeric_limits<int>::max();
-    }
-
-    auto source = m_image_graph_map[p0];
-    auto target = m_image_graph_map[p1];
+    auto source = point_to_index(p0, m_reference_image.cols);
+    auto target = point_to_index(p1, m_reference_image.cols);
 
     std::vector<int> distances(boost::num_vertices(m_image_graph));
     auto recorder = boost::record_distances(distances.data(), boost::on_tree_edge{});

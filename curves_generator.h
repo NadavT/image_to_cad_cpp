@@ -6,7 +6,7 @@
 using OffsetCurveDetails = std::tuple<Curve, std::vector<VertexDescriptor>>;
 using OffsetCurveMatcher = std::unordered_map<CagdCrvStruct *, std::vector<CagdCrvStruct *>>;
 
-using ImageGraph = boost::adjacency_list<boost::setS, boost::vecS, boost::bidirectionalS, cv::Point,
+using ImageGraph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS, unsigned int,
                                          boost::property<boost::edge_weight_t, double>>;
 using ImageVertexDescriptor = ImageGraph::vertex_descriptor;
 using ImageEdgeDescriptor = ImageGraph::edge_descriptor;
@@ -85,7 +85,6 @@ class CurvesGenerator
     double m_curve_density;
     int m_min_curve_length;
     ImageGraph m_image_graph;
-    ImageVertexDescriptorMap m_image_graph_map;
     double m_junction_radius_adder;
     std::unordered_map<cv::Point, double> m_junctions_radius;
 };
