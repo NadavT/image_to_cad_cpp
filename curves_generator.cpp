@@ -629,7 +629,7 @@ void CurvesGenerator::generate_surfaces_from_curves()
 
 void CurvesGenerator::fill_holes()
 {
-    std::set<VertexDescriptor> passed_junctions;
+    std::unordered_set<VertexDescriptor> passed_junctions;
     for (const auto &item : m_marked_junctions)
     {
         if (passed_junctions.count(item.first) > 0)
@@ -638,8 +638,8 @@ void CurvesGenerator::fill_holes()
         }
         const auto &junction = item.first;
         std::vector<IritPoint> points;
-        std::set<VertexDescriptor> neighborhood = get_marked_neighborhood(junction);
-        std::set<cv::Point2d> unique_points;
+        std::unordered_set<VertexDescriptor> neighborhood = get_marked_neighborhood(junction);
+        std::unordered_set<cv::Point> unique_points;
         std::cout << "\t\tNeighborhood of junction " << m_graph[junction].p << " has " << neighborhood.size()
                   << " elements" << std::endl;
         for (const auto &neighbor : neighborhood)
@@ -693,8 +693,16 @@ void CurvesGenerator::fill_holes()
                 }
                 CAGD_CRV_EVAL_E2(offset_curves[0], offset_curve1_junction_subdiv, &p0.get()->Pt[0]);
                 CAGD_CRV_EVAL_E2(offset_curves[1], offset_curve2_junction_subdiv, &p1.get()->Pt[0]);
-                points.push_back(std::move(p0));
-                points.push_back(std::move(p1));
+                if (unique_points.count(cv::Point(p0.get()->Pt[0], p0.get()->Pt[1])) == 0)
+                {
+                    unique_points.insert(cv::Point(p0.get()->Pt[0], p0.get()->Pt[1]));
+                    points.push_back(std::move(p0));
+                }
+                if (unique_points.count(cv::Point(p1.get()->Pt[0], p1.get()->Pt[1])) == 0)
+                {
+                    unique_points.insert(cv::Point(p1.get()->Pt[0], p1.get()->Pt[1]));
+                    points.push_back(std::move(p1));
+                }
             }
         }
 
@@ -1002,7 +1010,7 @@ std::vector<IritPoint> CurvesGenerator::get_intersection_points(
             curve_to_originating_curve[choosen_next_curve] = next_curve;
         }
     }
-    std::set<CagdCrvStruct *> used;
+    std::unordered_set<CagdCrvStruct *> used;
     for (const auto &item : curve_to_subdiv)
     {
         if (used.count(item.first) > 0)
@@ -1397,20 +1405,20 @@ IritSurface CurvesGenerator::generate_surface_from_pivot_and_points(const IritPo
     }
 }
 
-std::set<VertexDescriptor> CurvesGenerator::get_marked_neighborhood(const VertexDescriptor &junction)
+std::unordered_set<VertexDescriptor> CurvesGenerator::get_marked_neighborhood(const VertexDescriptor &junction)
 {
-    std::set<VertexDescriptor> visited;
+    std::unordered_set<VertexDescriptor> visited;
     return get_marked_neighborhood(junction, visited);
 }
 
-std::set<VertexDescriptor> CurvesGenerator::get_marked_neighborhood(const VertexDescriptor &junction,
-                                                                    std::set<VertexDescriptor> &visited)
+std::unordered_set<VertexDescriptor> CurvesGenerator::get_marked_neighborhood(
+    const VertexDescriptor &junction, std::unordered_set<VertexDescriptor> &visited)
 {
     if (visited.count(junction) > 0)
     {
-        return std::set<VertexDescriptor>();
+        return std::unordered_set<VertexDescriptor>();
     }
-    std::set<VertexDescriptor> neighborhood;
+    std::unordered_set<VertexDescriptor> neighborhood;
     neighborhood.insert(junction);
     visited.insert(junction);
     auto out_edges = boost::out_edges(junction, m_graph);

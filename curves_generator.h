@@ -53,9 +53,9 @@ class CurvesGenerator
     void fix_surface_orientation(IritSurface &surface, bool print_error = true);
     IritSurface generate_surface_from_pivot_and_points(const IritPoint &pivot, const IritPoint &p0, const IritPoint &p1,
                                                        double radius);
-    std::set<VertexDescriptor> get_marked_neighborhood(const VertexDescriptor &junction);
-    std::set<VertexDescriptor> get_marked_neighborhood(const VertexDescriptor &junction,
-                                                       std::set<VertexDescriptor> &visited);
+    std::unordered_set<VertexDescriptor> get_marked_neighborhood(const VertexDescriptor &junction);
+    std::unordered_set<VertexDescriptor> get_marked_neighborhood(const VertexDescriptor &junction,
+                                                                 std::unordered_set<VertexDescriptor> &visited);
 
   private:
     Graph &m_graph;

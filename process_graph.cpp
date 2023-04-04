@@ -200,7 +200,7 @@ void ProcessGraph::collapse_junctions(double junction_collapse_threshold)
     {
         changed = false;
         std::vector<VertexDescriptor> junctions = get_junctions();
-        std::set<VertexDescriptor> collapsed;
+        std::unordered_set<VertexDescriptor> collapsed;
 
         for (VertexDescriptor junction : junctions)
         {
@@ -294,7 +294,7 @@ std::tuple<double, std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> P
     double length = distance(graph[source].p, graph[direction].p);
     VertexDescriptor parent = direction;
     VertexDescriptor prev = source;
-    std::set<VertexDescriptor> visited({source, direction});
+    std::unordered_set<VertexDescriptor> visited({source, direction});
     while (boost::degree(parent, graph) == 2)
     {
         auto temp = parent;
