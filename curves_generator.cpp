@@ -12,8 +12,7 @@
 #include <inc_irit/ip_cnvrt.h>
 #include <inc_irit/iritprsr.h>
 
-#include <boost/graph/breadth_first_search.hpp>
-#include <boost/graph/johnson_all_pairs_shortest.hpp>
+#include <boost/graph/dijkstra_shortest_paths.hpp>
 
 CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
                                  const Image &reference_image, int distance_to_boundary_samples,
