@@ -76,6 +76,17 @@ void CurvesGenerator::write_offset_curves(const std::string &filename)
     IPCloseStream(handler, TRUE);
 }
 
+void CurvesGenerator::write_filtered_offset_curves(const std::string &filename)
+{
+    int handler = IPOpenDataFile(filename.c_str(), FALSE, TRUE);
+    for (auto &curve : m_filtered_offset_curves)
+    {
+        char *error;
+        BzrCrvWriteToFile2(std::get<0>(curve).get(), handler, 4, nullptr, &error);
+    }
+    IPCloseStream(handler, TRUE);
+}
+
 void CurvesGenerator::write_surfaces(const std::string &filename)
 {
     int handler = IPOpenDataFile(filename.c_str(), FALSE, TRUE);
@@ -441,6 +452,8 @@ void CurvesGenerator::generate_offset_curves()
                         m_marked_junctions[junction] = 1;
                     }
                 }
+                m_filtered_offset_curves.push_back({std::move(new_offset_curve), junctions});
+                m_filtered_offset_curves.push_back({std::move(new_opposite_offset_curve), junctions});
                 lock.unlock();
             }
         }

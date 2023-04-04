@@ -24,6 +24,7 @@ class CurvesGenerator
 
     void write_curves(const std::string &filename);
     void write_offset_curves(const std::string &filename);
+    void write_filtered_offset_curves(const std::string &filename);
     void write_surfaces(const std::string &filename);
     void write_extrusions(const std::string &filename);
 
@@ -64,6 +65,7 @@ class CurvesGenerator
     int m_max_order;
     int m_target_order;
     std::vector<OffsetCurveDetails> m_offset_curves;
+    std::vector<OffsetCurveDetails> m_filtered_offset_curves;
     OffsetCurveMatcher m_curve_to_offset_curves;
     std::unordered_map<VertexDescriptor, std::vector<CagdCrvStruct *>> m_junction_to_curves;
     std::set<std::pair<VertexDescriptor, VertexDescriptor>> m_connections;
