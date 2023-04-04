@@ -364,8 +364,10 @@ void CurvesGenerator::generate_offset_curves()
             double min_distance_opposite_curve = std::numeric_limits<double>::max();
             for (int i = 0; i < m_distance_to_boundary_samples; i++)
             {
-                CAGD_CRV_EVAL_E2(new_offset_curve.get(), static_cast<double>(i) / (m_distance_to_boundary_samples - 1),
-                                 &point->Pt[0]);
+                double sample =
+                    m_distance_in_boundary_backoff + (static_cast<double>(i) / (m_distance_to_boundary_samples - 1)) *
+                                                         (1 - 2 * m_distance_in_boundary_backoff);
+                CAGD_CRV_EVAL_E2(new_offset_curve.get(), sample, &point->Pt[0]);
                 cv::Point p(point->Pt[0], point->Pt[1]);
                 double distance = distance_to_boundary(p, m_distance_to_boundary_threshold * 2);
                 if (distance > max_distance_offset_curve)
