@@ -1221,6 +1221,7 @@ Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curv
     cv::Point junction1(curve->Points[1][curve->Length - 1], curve->Points[2][curve->Length - 1]);
     double junction1_radius = std::abs(width_curve->Points[1][width_curve->Length - 1]) + m_junction_radius_adder;
 
+    m_junction_radius_lock.lock();
     if (m_junctions_radius.count(junction0) == 0)
     {
         m_junctions_radius[junction0] = junction0_radius;
@@ -1238,6 +1239,7 @@ Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curv
     {
         m_junctions_radius[junction1] = std::min(m_junctions_radius[junction1], junction1_radius);
     }
+    m_junction_radius_lock.unlock();
 
     double curve_length = CagdCrvArcLenPoly(curve.get());
     for (double i = 0; i < 0.5; i += 1 / curve_length)

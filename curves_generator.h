@@ -87,6 +87,7 @@ class CurvesGenerator
     ImageGraph m_image_graph;
     double m_junction_radius_adder;
     std::unordered_map<cv::Point, double> m_junctions_radius;
+    std::mutex m_junction_radius_lock;
 };
 
 #endif /* CURVES_GENERATOR_H */
