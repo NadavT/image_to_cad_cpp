@@ -1211,10 +1211,6 @@ int CurvesGenerator::distance_in_boundary(const cv::Point &p0, const cv::Point &
     boost::dijkstra_shortest_paths(m_image_graph, source, boost::predecessor_map(&p[0]).distance_map(&d[0]));
 
     return d[target] != 0 ? d[target] : std::numeric_limits<int>::max();
-
-    boost::breadth_first_search(m_image_graph, source, boost::visitor(boost::make_bfs_visitor(recorder)));
-
-    return distances.at(target) != 0 ? distances.at(target) : std::numeric_limits<int>::max();
 }
 
 Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curve &width_curve,
