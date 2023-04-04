@@ -17,8 +17,8 @@ class PreprocessImage
     std::vector<cv::Vec4i> &get_hierarchy();
 
   private:
-    std::list<cv::Point> get_near_surrounding(int x, int y);
-    std::vector<cv::Point> count_surrounding(int x, int y);
+    std::list<cv::Point> get_near_surrounding(int x, int y, int color);
+    std::vector<cv::Point> count_surrounding(int x, int y, int color);
     void remove_islands();
     void find_segments();
 

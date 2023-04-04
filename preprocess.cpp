@@ -51,7 +51,7 @@ std::vector<cv::Vec4i> &PreprocessImage::get_hierarchy()
     return m_hierarchy;
 }
 
-std::list<cv::Point> PreprocessImage::get_near_surrounding(int x, int y)
+std::list<cv::Point> PreprocessImage::get_near_surrounding(int x, int y, int color)
 {
     std::list<cv::Point> surrounding;
     for (int i = std::max(x - 1, 0); i < std::min(x + 2, m_grayscale_image.cols); i++)
@@ -62,7 +62,7 @@ std::list<cv::Point> PreprocessImage::get_near_surrounding(int x, int y)
             {
                 continue;
             }
-            if (m_grayscale_image.at<unsigned char>({i, j}) == 0 && !m_checked[i][j])
+            if (m_grayscale_image.at<unsigned char>({i, j}) == color && !m_checked[i][j])
             {
                 surrounding.push_back(cv::Point(i, j));
                 m_checked[i][j] = true;
@@ -73,10 +73,10 @@ std::list<cv::Point> PreprocessImage::get_near_surrounding(int x, int y)
     return surrounding;
 }
 
-std::vector<cv::Point> PreprocessImage::count_surrounding(int x, int y)
+std::vector<cv::Point> PreprocessImage::count_surrounding(int x, int y, int color)
 {
     int count = 1;
-    std::list<cv::Point> to_check = get_near_surrounding(x, y);
+    std::list<cv::Point> to_check = get_near_surrounding(x, y, color);
     std::vector<cv::Point> to_paint = {{x, y}};
     while (to_check.size() > 0)
     {
@@ -85,7 +85,7 @@ std::vector<cv::Point> PreprocessImage::count_surrounding(int x, int y)
         m_checked[p.x][p.y] = true;
         to_paint.push_back(p);
         count++;
-        std::list<cv::Point> surrounding = get_near_surrounding(p.x, p.y);
+        std::list<cv::Point> surrounding = get_near_surrounding(p.x, p.y, color);
         to_check.insert(to_check.end(), surrounding.begin(), surrounding.end());
     }
 
@@ -94,23 +94,26 @@ std::vector<cv::Point> PreprocessImage::count_surrounding(int x, int y)
 
 void PreprocessImage::remove_islands()
 {
-    for (int i = 0; i < m_grayscale_image.cols; i++)
+    for (int color : {0, 255})
     {
-        for (int j = 0; j < m_grayscale_image.rows; j++)
+        for (int i = 0; i < m_grayscale_image.cols; i++)
         {
-            if (m_grayscale_image.at<unsigned char>({i, j}) == 0 && !m_checked[i][j])
+            for (int j = 0; j < m_grayscale_image.rows; j++)
             {
-                std::vector<cv::Point> to_paint = count_surrounding(i, j);
-                size_t count = to_paint.size();
-                if (count <= m_island_threshold)
+                if (m_grayscale_image.at<unsigned char>({i, j}) == color && !m_checked[i][j])
                 {
-                    for (cv::Point p : to_paint)
+                    std::vector<cv::Point> to_paint = count_surrounding(i, j, color);
+                    size_t count = to_paint.size();
+                    if (count <= m_island_threshold)
                     {
-                        m_grayscale_image.at<unsigned char>(p) = 255;
+                        for (cv::Point p : to_paint)
+                        {
+                            m_grayscale_image.at<unsigned char>(p) = 255 - color;
+                        }
                     }
                 }
+                m_checked[i][j] = true;
             }
-            m_checked[i][j] = true;
         }
     }
 }
