@@ -56,6 +56,10 @@ int main(int argc, char **argv)
         .default_value(4)
         .scan<'i', int>();
     program.add_argument("-ex", "--extrusion").help("Extrusion amount").default_value(10.0).scan<'g', double>();
+    program.add_argument("-foc", "--filter_offset_curves")
+        .help("Should filter offset curves")
+        .default_value(false)
+        .implicit_value(true);
     program.add_argument("-dbs", "--distance_to_boundary_samples")
         .help("distance to boundary samples")
         .default_value(5)
@@ -120,15 +124,15 @@ int main(int argc, char **argv)
                        program.get<double>("--junction_smooth_threshold"), preprocess_image.get_colored_image().cols,
                        preprocess_image.get_colored_image().rows, program.get<bool>("--border")),
                    "Processing graph");
-    TIMED_FUNCTION(CurvesGenerator curves_generator(
-                       process_graph.get_graph(), program.get<int>("--curve_order"),
-                       program.get<int>("--target_curve_order"), program.get<double>("--extrusion"),
-                       preprocess_image.get_colored_image(), program.get<int>("--distance_to_boundary_samples"),
-                       program.get<int>("--distance_to_boundary_threshold"),
-                       program.get<double>("--distance_in_boundary_backoff"),
-                       program.get<double>("--distance_in_boundary_factor"), program.get<double>("--curve_density"),
-                       program.get<int>("--curve_min_length"), program.get<double>("--junction_radius_adder")),
-                   "Generating curves");
+    TIMED_FUNCTION(
+        CurvesGenerator curves_generator(
+            process_graph.get_graph(), program.get<int>("--curve_order"), program.get<int>("--target_curve_order"),
+            program.get<double>("--extrusion"), program.get<bool>("--filter_offset_curves"),
+            preprocess_image.get_colored_image(), program.get<int>("--distance_to_boundary_samples"),
+            program.get<int>("--distance_to_boundary_threshold"), program.get<double>("--distance_in_boundary_backoff"),
+            program.get<double>("--distance_in_boundary_factor"), program.get<double>("--curve_density"),
+            program.get<int>("--curve_min_length"), program.get<double>("--junction_radius_adder")),
+        "Generating curves");
     TIMED_FUNCTION(curves_generator.write_curves("curves.itd"), "Exporting curves to file");
     TIMED_FUNCTION(curves_generator.write_offset_curves("offset_curves.itd"), "Exporting offset curves to file");
     TIMED_FUNCTION(curves_generator.write_filtered_offset_curves("filtered_offset_curves.itd"),

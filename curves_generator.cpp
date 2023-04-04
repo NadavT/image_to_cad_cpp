@@ -22,7 +22,7 @@ static inline unsigned int point_to_index(const cv::Point &point, const int widt
 }
 
 CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
-                                 const Image &reference_image, int distance_to_boundary_samples,
+                                 bool filter_curves, const Image &reference_image, int distance_to_boundary_samples,
                                  int distance_to_boundary_threshold, double distance_in_boundary_backoff,
                                  double distance_in_boundary_factor, double curve_density, int min_curve_length,
                                  double junction_radius_adder)
@@ -31,6 +31,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     , m_max_order(max_order)
     , m_target_order(target_order)
     , m_offset_curves()
+    , m_filter_offset_curves(filter_curves)
     , m_extrusion_amount(extrusion_amount)
     , m_reference_image(reference_image)
     , m_distance_to_boundary_samples(distance_to_boundary_samples)
@@ -51,7 +52,10 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
         m_target_order = m_max_order;
     }
 
-    TIMED_INNER_FUNCTION(generate_image_graph(), "Generating image graph");
+    if (m_filter_offset_curves)
+    {
+        TIMED_INNER_FUNCTION(generate_image_graph(), "Generating image graph");
+    }
     TIMED_INNER_FUNCTION(generate_curves(), "Generating curves");
     TIMED_INNER_FUNCTION(decrease_curves_order(), "Decrease curves order");
     TIMED_INNER_FUNCTION(generate_offset_curves(), "Generating offset curves");
@@ -351,72 +355,77 @@ void CurvesGenerator::generate_offset_curves()
             trim_curve_to_fit_boundary(curve, opposite_width_curve, opposite_offset_curve);
         if (new_offset_curve != nullptr && new_opposite_offset_curve != nullptr)
         {
-            CagdPtStruct *point = CagdPtNew();
-            double max_distance_offset_curve = 0;
-            double min_distance_offset_curve = std::numeric_limits<double>::max();
-            double max_distance_opposite_curve = 0;
-            double min_distance_opposite_curve = std::numeric_limits<double>::max();
-            for (int i = 0; i < m_distance_to_boundary_samples; i++)
+            bool should_filter = false;
+            if (m_filter_offset_curves)
             {
-                double sample =
-                    m_distance_in_boundary_backoff + (static_cast<double>(i) / (m_distance_to_boundary_samples - 1)) *
-                                                         (1 - 2 * m_distance_in_boundary_backoff);
-                CAGD_CRV_EVAL_E2(new_offset_curve.get(), sample, &point->Pt[0]);
-                cv::Point p(point->Pt[0], point->Pt[1]);
-                double distance = distance_to_boundary(p, m_distance_to_boundary_threshold * 2);
-                if (distance > max_distance_offset_curve)
+                CagdPtStruct *point = CagdPtNew();
+                double max_distance_offset_curve = 0;
+                double min_distance_offset_curve = std::numeric_limits<double>::max();
+                double max_distance_opposite_curve = 0;
+                double min_distance_opposite_curve = std::numeric_limits<double>::max();
+                for (int i = 0; i < m_distance_to_boundary_samples; i++)
                 {
-                    max_distance_offset_curve = distance;
+                    double sample = m_distance_in_boundary_backoff +
+                                    (static_cast<double>(i) / (m_distance_to_boundary_samples - 1)) *
+                                        (1 - 2 * m_distance_in_boundary_backoff);
+                    CAGD_CRV_EVAL_E2(new_offset_curve.get(), sample, &point->Pt[0]);
+                    cv::Point p(point->Pt[0], point->Pt[1]);
+                    double distance = distance_to_boundary(p, m_distance_to_boundary_threshold * 2);
+                    if (distance > max_distance_offset_curve)
+                    {
+                        max_distance_offset_curve = distance;
+                    }
+                    if (distance < min_distance_opposite_curve)
+                    {
+                        min_distance_opposite_curve = distance;
+                    }
+                    CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(),
+                                     static_cast<double>(i) / (m_distance_to_boundary_samples - 1), &point->Pt[0]);
+                    cv::Point p2(point->Pt[0], point->Pt[1]);
+                    distance = distance_to_boundary(p2, m_distance_to_boundary_threshold * 2);
+                    if (distance > max_distance_opposite_curve)
+                    {
+                        max_distance_opposite_curve = distance;
+                    }
+                    if (distance < min_distance_opposite_curve)
+                    {
+                        min_distance_opposite_curve = distance;
+                    }
                 }
-                if (distance < min_distance_opposite_curve)
-                {
-                    min_distance_opposite_curve = distance;
-                }
-                CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(),
-                                 static_cast<double>(i) / (m_distance_to_boundary_samples - 1), &point->Pt[0]);
+
+                CAGD_CRV_EVAL_E2(new_offset_curve.get(), m_distance_in_boundary_backoff, &point->Pt[0]);
+                cv::Point p0(point->Pt[0], point->Pt[1]);
+                CAGD_CRV_EVAL_E2(new_offset_curve.get(), 1 - m_distance_in_boundary_backoff, &point->Pt[0]);
+                cv::Point p1(point->Pt[0], point->Pt[1]);
+                CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), m_distance_in_boundary_backoff, &point->Pt[0]);
                 cv::Point p2(point->Pt[0], point->Pt[1]);
-                distance = distance_to_boundary(p2, m_distance_to_boundary_threshold * 2);
-                if (distance > max_distance_opposite_curve)
-                {
-                    max_distance_opposite_curve = distance;
-                }
-                if (distance < min_distance_opposite_curve)
-                {
-                    min_distance_opposite_curve = distance;
-                }
+                CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), 1 - m_distance_in_boundary_backoff, &point->Pt[0]);
+                cv::Point p3(point->Pt[0], point->Pt[1]);
+                double max_diff = std::max({(max_distance_offset_curve - min_distance_offset_curve) /
+                                                CagdCrvArcLenPoly(new_offset_curve.get()),
+                                            (max_distance_opposite_curve - min_distance_opposite_curve) /
+                                                CagdCrvArcLenPoly(new_opposite_offset_curve.get())});
+                CagdPtFree(point);
+                double offset_curve_length = CagdCrvArcLenPoly(new_offset_curve.get());
+                double opposite_offset_curve_length = CagdCrvArcLenPoly(new_opposite_offset_curve.get());
+                should_filter =
+                    (max_distance_offset_curve >= m_distance_to_boundary_threshold ||
+                     max_distance_opposite_curve >= m_distance_to_boundary_threshold || max_diff >= 0.1 ||
+                     (offset_curve_length * (1 - 2 * m_distance_in_boundary_backoff)) * 0.5 >=
+                         distance_in_boundary(closest_point_on_boundary(p0, m_distance_to_boundary_threshold),
+                                              closest_point_on_boundary(p1, m_distance_to_boundary_threshold)) ||
+                     distance_in_boundary(closest_point_on_boundary(p0, m_distance_to_boundary_threshold),
+                                          closest_point_on_boundary(p1, m_distance_to_boundary_threshold)) >=
+                         m_distance_in_boundary_factor * offset_curve_length ||
+                     (opposite_offset_curve_length * (1 - 2 * m_distance_in_boundary_backoff)) * 0.5 >=
+                         distance_in_boundary(closest_point_on_boundary(p2, m_distance_to_boundary_threshold),
+                                              closest_point_on_boundary(p3, m_distance_to_boundary_threshold)) ||
+                     distance_in_boundary(closest_point_on_boundary(p2, m_distance_to_boundary_threshold),
+                                          closest_point_on_boundary(p3, m_distance_to_boundary_threshold)) >=
+                         m_distance_in_boundary_factor * opposite_offset_curve_length);
             }
 
-            CAGD_CRV_EVAL_E2(new_offset_curve.get(), m_distance_in_boundary_backoff, &point->Pt[0]);
-            cv::Point p0(point->Pt[0], point->Pt[1]);
-            CAGD_CRV_EVAL_E2(new_offset_curve.get(), 1 - m_distance_in_boundary_backoff, &point->Pt[0]);
-            cv::Point p1(point->Pt[0], point->Pt[1]);
-            CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), m_distance_in_boundary_backoff, &point->Pt[0]);
-            cv::Point p2(point->Pt[0], point->Pt[1]);
-            CAGD_CRV_EVAL_E2(new_opposite_offset_curve.get(), 1 - m_distance_in_boundary_backoff, &point->Pt[0]);
-            cv::Point p3(point->Pt[0], point->Pt[1]);
-            double max_diff = std::max(
-                {(max_distance_offset_curve - min_distance_offset_curve) / CagdCrvArcLenPoly(new_offset_curve.get()),
-                 (max_distance_opposite_curve - min_distance_opposite_curve) /
-                     CagdCrvArcLenPoly(new_opposite_offset_curve.get())});
-
-            double offset_curve_length = CagdCrvArcLenPoly(new_offset_curve.get());
-            double opposite_offset_curve_length = CagdCrvArcLenPoly(new_opposite_offset_curve.get());
-
-            if (junctions.size() < 2 ||
-                (max_distance_offset_curve < m_distance_to_boundary_threshold &&
-                 max_distance_opposite_curve < m_distance_to_boundary_threshold && max_diff < 0.1 &&
-                 (offset_curve_length * (1 - 2 * m_distance_in_boundary_backoff)) * 0.5 <
-                     distance_in_boundary(closest_point_on_boundary(p0, m_distance_to_boundary_threshold),
-                                          closest_point_on_boundary(p1, m_distance_to_boundary_threshold)) &&
-                 distance_in_boundary(closest_point_on_boundary(p0, m_distance_to_boundary_threshold),
-                                      closest_point_on_boundary(p1, m_distance_to_boundary_threshold)) <
-                     m_distance_in_boundary_factor * offset_curve_length &&
-                 (opposite_offset_curve_length * (1 - 2 * m_distance_in_boundary_backoff)) * 0.5 <
-                     distance_in_boundary(closest_point_on_boundary(p2, m_distance_to_boundary_threshold),
-                                          closest_point_on_boundary(p3, m_distance_to_boundary_threshold)) &&
-                 distance_in_boundary(closest_point_on_boundary(p2, m_distance_to_boundary_threshold),
-                                      closest_point_on_boundary(p3, m_distance_to_boundary_threshold)) <
-                     m_distance_in_boundary_factor * opposite_offset_curve_length))
+            if (junctions.size() < 2 || !should_filter)
             {
                 update_lock.lock();
                 m_offset_curves.push_back({std::move(new_offset_curve), junctions});

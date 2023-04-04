@@ -15,7 +15,7 @@ using ImageVertexDescriptorMap = std::unordered_map<cv::Point, ImageVertexDescri
 class CurvesGenerator
 {
   public:
-    CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
+    CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount, bool filter_curves,
                     const Image &reference_image, int distance_to_boundary_samples, int distance_to_boundary_threshold,
                     double distance_in_boundary_backoff, double distance_in_boundary_factor, double curve_density,
                     int min_curve_length, double junction_radius_adder);
@@ -65,6 +65,7 @@ class CurvesGenerator
     int m_max_order;
     int m_target_order;
     std::vector<OffsetCurveDetails> m_offset_curves;
+    bool m_filter_offset_curves;
     std::vector<OffsetCurveDetails> m_filtered_offset_curves;
     OffsetCurveMatcher m_curve_to_offset_curves;
     std::unordered_map<VertexDescriptor, std::vector<CagdCrvStruct *>> m_junction_to_curves;
