@@ -55,7 +55,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     TIMED_INNER_FUNCTION(generate_offset_curves(), "Generating offset curves");
     TIMED_INNER_FUNCTION(sort_junction_curves(), "Sorting junction curves");
     TIMED_INNER_FUNCTION(generate_surfaces_from_junctions(), "Generating surfaces from junctions");
-    TIMED_INNER_FUNCTION(fill_holes(), "Filling holes");
+    // TIMED_INNER_FUNCTION(fill_holes(), "Filling holes");
     TIMED_INNER_FUNCTION(generate_surfaces_from_curves(), "Generating surfaces from curves");
     TIMED_INNER_FUNCTION(extrude_surfaces(), "Extruding surfaces");
 }
@@ -1305,7 +1305,7 @@ void CurvesGenerator::fix_surface_orientation(IritSurface &surface, bool print_e
         return;
     }
     double min, max;
-    CagdQuadGetPlnrSrfJacobianMinMax(surface.get(), &min, &max, TRUE);
+    CagdGetPlnrSrfJacobianMinMax(surface.get(), &min, &max, TRUE);
     if (min * max < 0)
     {
         if (print_error)
