@@ -11,19 +11,19 @@ PreprocessImage::PreprocessImage(const Image &image, double scale_factor, double
     , m_island_threshold(island_threshold)
     , m_checked(image.cols, std::vector<bool>(image.rows, false))
 {
+    TIMED_INNER_FUNCTION(convert_to_black_and_white(), "converting to black and white");
+    TIMED_INNER_FUNCTION(crop_to_fit(), "cropping to fit");
     TIMED_INNER_FUNCTION(remove_islands(), "removing islands");
 
     if (add_border)
     {
-        cv::Mat bordered(image.rows + 4, image.cols + 4, image.type(), cv::Scalar(255));
-        cv::Rect offset_rect = cv::Rect(2, 2, image.cols, image.rows);
-        image.copyTo(bordered(offset_rect));
-        m_grayscale_image = bordered;
+        TIMED_INNER_FUNCTION(add_border_to_image(), "adding border");
     }
 
-    cv::resize(m_grayscale_image, m_grayscale_image,
-               cv::Size(m_grayscale_image.cols * scale_factor, m_grayscale_image.rows * scale_factor), 0, 0,
-               cv::INTER_LINEAR);
+    if (scale_factor != 1.0)
+    {
+        TIMED_INNER_FUNCTION(scale(), "scaling");
+    }
 
     TIMED_INNER_FUNCTION(find_segments(), "finding segments");
 
@@ -49,6 +49,69 @@ std::vector<std::vector<cv::Point>> &PreprocessImage::get_segments()
 std::vector<cv::Vec4i> &PreprocessImage::get_hierarchy()
 {
     return m_hierarchy;
+}
+
+void PreprocessImage::convert_to_black_and_white()
+{
+    for (int i = 0; i < m_grayscale_image.cols; i++)
+    {
+        for (int j = 0; j < m_grayscale_image.rows; j++)
+        {
+            if (m_grayscale_image.at<unsigned char>({i, j}) < 128)
+            {
+                m_grayscale_image.at<unsigned char>({i, j}) = 0;
+            }
+            else
+            {
+                m_grayscale_image.at<unsigned char>({i, j}) = 255;
+            }
+        }
+    }
+}
+
+void PreprocessImage::crop_to_fit()
+{
+    int leftmost = m_grayscale_image.cols;
+    int rightmost = 0;
+    int topmost = m_grayscale_image.rows;
+    int bottommost = 0;
+    for (int i = 0; i < m_grayscale_image.cols; i++)
+    {
+        for (int j = 0; j < m_grayscale_image.rows; j++)
+        {
+            if (m_grayscale_image.at<unsigned char>({i, j}) == 0)
+            {
+                leftmost = std::min(leftmost, i);
+                rightmost = std::max(rightmost, i);
+                topmost = std::min(topmost, j);
+                bottommost = std::max(bottommost, j);
+            }
+        }
+    }
+    assert(leftmost < rightmost);
+    assert(topmost < bottommost);
+    if (leftmost >= rightmost || topmost >= bottommost)
+    {
+        std::cerr << "ERROR: Image is empty" << std::endl;
+        throw std::runtime_error("Image is empty");
+    }
+    cv::Rect roi = cv::Rect(leftmost, topmost, rightmost - leftmost, bottommost - topmost);
+    m_grayscale_image = m_grayscale_image(roi);
+}
+
+void PreprocessImage::add_border_to_image()
+{
+    cv::Mat bordered(m_grayscale_image.rows + 4, m_grayscale_image.cols + 4, m_grayscale_image.type(), cv::Scalar(255));
+    cv::Rect offset_rect = cv::Rect(2, 2, m_grayscale_image.cols, m_grayscale_image.rows);
+    m_grayscale_image.copyTo(bordered(offset_rect));
+    m_grayscale_image = bordered;
+}
+
+void PreprocessImage::scale()
+{
+    cv::resize(m_grayscale_image, m_grayscale_image,
+               cv::Size(m_grayscale_image.cols * m_scale_factor, m_grayscale_image.rows * m_scale_factor), 0, 0,
+               cv::INTER_LINEAR);
 }
 
 std::list<cv::Point> PreprocessImage::get_near_surrounding(int x, int y, int color)

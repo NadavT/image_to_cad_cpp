@@ -17,6 +17,10 @@ class PreprocessImage
     std::vector<cv::Vec4i> &get_hierarchy();
 
   private:
+    void convert_to_black_and_white();
+    void crop_to_fit();
+    void add_border_to_image();
+    void scale();
     std::list<cv::Point> get_near_surrounding(int x, int y, int color);
     std::vector<cv::Point> count_surrounding(int x, int y, int color);
     void remove_islands();
