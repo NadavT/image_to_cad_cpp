@@ -9,7 +9,9 @@
 class PreprocessImage
 {
   public:
-    PreprocessImage(const Image &image, double scale_factor, double island_threshold, bool add_border);
+    PreprocessImage(const Image &image, bool should_convert_to_black_and_white, bool should_crop_to_fit,
+                    int crop_to_fit_pad_left, int crop_to_fit_pad_right, int crop_to_fit_pad_top,
+                    int crop_to_fit_pad_bottom, double island_threshold, bool should_add_border, double scale_factor);
 
     Image &get_colored_image();
     Image &get_grayscale_image();
@@ -18,8 +20,9 @@ class PreprocessImage
 
   private:
     void convert_to_black_and_white();
-    void crop_to_fit();
-    void add_border_to_image();
+    void crop_to_fit(int crop_to_fit_pad_left, int crop_to_fit_pad_right, int crop_to_fit_pad_top,
+                     int crop_to_fit_pad_bottom);
+    void add_border();
     void scale();
     std::list<cv::Point> get_near_surrounding(int x, int y, int color);
     std::vector<cv::Point> count_surrounding(int x, int y, int color);

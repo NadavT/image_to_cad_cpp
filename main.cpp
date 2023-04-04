@@ -28,6 +28,31 @@ int main(int argc, char **argv)
         return load_image(value);
     });
     program.add_argument("-o", "--output_dir").help("Output directory").default_value(std::string("results"));
+    program.add_argument("-no_cbw", "--no_convert_to_black_and_white")
+        .help("Should convert to black and white")
+        .default_value(false)
+        .implicit_value(true);
+    program.add_argument("-no_cft", "--no_crop_to_fit")
+        .help("Should crop to fit")
+        .default_value(false)
+        .implicit_value(true);
+    program.add_argument("-ctf_pl", "--crop_to_fit_padding_left")
+        .help("Crop to fit padding left")
+        .default_value(0)
+        .scan<'i', int>();
+    program.add_argument("-ctf_pr", "--crop_to_fit_padding_right")
+        .help("Crop to fit padding right")
+        .default_value(0)
+        .scan<'i', int>();
+    program.add_argument("-ctf_pt", "--crop_to_fit_padding_top")
+        .help("Crop to fit padding top")
+        .default_value(0)
+        .scan<'i', int>();
+    program.add_argument("-ctf_pb", "--crop_to_fit_padding_bottom")
+        .help("Crop to fit padding bottom")
+        .default_value(0)
+        .scan<'i', int>();
+    program.add_argument("-it", "--islands_threshold").help("Islands threshold").default_value(4.0).scan<'g', double>();
     program.add_argument("-s", "--scale").help("Scale factor").default_value(4.0).scan<'g', double>();
     program.add_argument("-r", "--reduction_proximity")
         .help("Reduction proximity")
@@ -37,7 +62,6 @@ int main(int argc, char **argv)
         .help("Hanging leaf threshold")
         .default_value(250.0)
         .scan<'g', double>();
-    program.add_argument("-it", "--islands_threshold").help("Islands threshold").default_value(4.0).scan<'g', double>();
     program.add_argument("-jct", "--junction_collapse_threshold")
         .help("Junction collapse threshold")
         .default_value(20.0)
@@ -109,9 +133,12 @@ int main(int argc, char **argv)
     Image image = program.get<Image>("--input");
     cv::imwrite("original.png", image);
 
-    TIMED_FUNCTION(PreprocessImage preprocess_image(image, program.get<double>("--scale"),
-                                                    program.get<double>("--islands_threshold"),
-                                                    program.get<bool>("--border")),
+    TIMED_FUNCTION(PreprocessImage preprocess_image(
+                       image, !program.get<bool>("--no_convert_to_black_and_white"),
+                       !program.get<bool>("--no_crop_to_fit"), program.get<int>("--crop_to_fit_padding_left"),
+                       program.get<int>("--crop_to_fit_padding_right"), program.get<int>("--crop_to_fit_padding_top"),
+                       program.get<int>("--crop_to_fit_padding_bottom"), program.get<double>("--islands_threshold"),
+                       program.get<bool>("--border"), program.get<double>("--scale")),
                    "Preprocessing");
     TIMED_FUNCTION(
         VoronoiCalculator voronoi_calculator(preprocess_image.get_colored_image(), preprocess_image.get_segments()),

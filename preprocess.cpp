@@ -5,27 +5,38 @@
 
 #include "utils.h"
 
-PreprocessImage::PreprocessImage(const Image &image, double scale_factor, double island_threshold, bool add_border)
+PreprocessImage::PreprocessImage(const Image &image, bool should_convert_to_black_and_white, bool should_crop_to_fit,
+                                 int crop_to_fit_pad_left, int crop_to_fit_pad_right, int crop_to_fit_pad_top,
+                                 int crop_to_fit_pad_bottom, double island_threshold, bool should_add_border,
+                                 double scale_factor)
     : m_grayscale_image(image)
     , m_scale_factor(scale_factor)
     , m_island_threshold(island_threshold)
     , m_checked(image.cols, std::vector<bool>(image.rows, false))
 {
-    TIMED_INNER_FUNCTION(convert_to_black_and_white(), "converting to black and white");
-    TIMED_INNER_FUNCTION(crop_to_fit(), "cropping to fit");
-    TIMED_INNER_FUNCTION(remove_islands(), "removing islands");
-
-    if (add_border)
+    if (should_convert_to_black_and_white)
     {
-        TIMED_INNER_FUNCTION(add_border_to_image(), "adding border");
+        TIMED_INNER_FUNCTION(convert_to_black_and_white(), "Converting to black and white");
+    }
+    if (should_crop_to_fit)
+    {
+        TIMED_INNER_FUNCTION(
+            crop_to_fit(crop_to_fit_pad_left, crop_to_fit_pad_right, crop_to_fit_pad_top, crop_to_fit_pad_bottom),
+            "Cropping to fit");
+    }
+    TIMED_INNER_FUNCTION(remove_islands(), "Removing islands");
+
+    if (should_add_border)
+    {
+        TIMED_INNER_FUNCTION(add_border(), "Adding border");
     }
 
     if (scale_factor != 1.0)
     {
-        TIMED_INNER_FUNCTION(scale(), "scaling");
+        TIMED_INNER_FUNCTION(scale(), "Scaling");
     }
 
-    TIMED_INNER_FUNCTION(find_segments(), "finding segments");
+    TIMED_INNER_FUNCTION(find_segments(), "Finding segments");
 
     cv::drawContours(m_colored_image, m_segments, -1, {0xff, 0, 0}, 1);
     cv::imwrite("contours.png", m_colored_image);
@@ -69,7 +80,8 @@ void PreprocessImage::convert_to_black_and_white()
     }
 }
 
-void PreprocessImage::crop_to_fit()
+void PreprocessImage::crop_to_fit(int crop_to_fit_pad_left, int crop_to_fit_pad_right, int crop_to_fit_pad_top,
+                                  int crop_to_fit_pad_bottom)
 {
     int leftmost = m_grayscale_image.cols;
     int rightmost = 0;
@@ -95,11 +107,15 @@ void PreprocessImage::crop_to_fit()
         std::cerr << "ERROR: Image is empty" << std::endl;
         throw std::runtime_error("Image is empty");
     }
+    leftmost = std::clamp(leftmost - crop_to_fit_pad_left, 0, m_grayscale_image.cols);
+    rightmost = std::clamp(rightmost + crop_to_fit_pad_right, 0, m_grayscale_image.cols);
+    topmost = std::clamp(topmost - crop_to_fit_pad_top, 0, m_grayscale_image.rows);
+    bottommost = std::clamp(bottommost + crop_to_fit_pad_bottom, 0, m_grayscale_image.rows);
     cv::Rect roi = cv::Rect(leftmost, topmost, rightmost - leftmost, bottommost - topmost);
     m_grayscale_image = m_grayscale_image(roi);
 }
 
-void PreprocessImage::add_border_to_image()
+void PreprocessImage::add_border()
 {
     cv::Mat bordered(m_grayscale_image.rows + 4, m_grayscale_image.cols + 4, m_grayscale_image.type(), cv::Scalar(255));
     cv::Rect offset_rect = cv::Rect(2, 2, m_grayscale_image.cols, m_grayscale_image.rows);
