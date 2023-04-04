@@ -38,7 +38,7 @@ if(NOT OpenCV_FOUND OR is_fetched)
 		GIT_SHALLOW TRUE
 	)
 
-	FetchContent_MakeAvailableExclude(OpenCV)
+	FetchContent_MakeAvailableExclude(opencv)
 
 	collect_include_dirs(OpenCV_INCLUDE_DIRS ${OpenCV_SOURCE_DIR}/modules)
 	list(APPEND OpenCV_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR} ${OpenCV_SOURCE_DIR}/include)

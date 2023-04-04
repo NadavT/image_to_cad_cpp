@@ -21,11 +21,11 @@ if(NOT Boost_FOUND)
         GIT_PROGRESS TRUE
         GIT_SHALLOW TRUE
     )
-    FetchContent_GetProperties(Boost)
+    FetchContent_GetProperties(boost)
 
-    if(NOT Boost_POPULATED)
-        FetchContent_Populate(Boost)
+    if(NOT boost_POPULATED)
+        FetchContent_Populate(boost)
     endif()
 
-    collect_include_dirs(Boost_INCLUDE_DIRS ${boostorg_SOURCE_DIR}/libs)
+    collect_include_dirs(Boost_INCLUDE_DIRS ${boost_SOURCE_DIR}/libs)
 endif()
