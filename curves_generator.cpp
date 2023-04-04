@@ -14,6 +14,8 @@
 
 #include <boost/graph/dijkstra_shortest_paths.hpp>
 
+#define INTERSECTION_PROXIMITY_THRESHOLD 0.00001
+
 static inline unsigned int point_to_index(const cv::Point &point, const int width)
 {
     return point.y * width + point.x;
@@ -940,8 +942,10 @@ std::vector<IritPoint> CurvesGenerator::get_intersection_points(
         {
             for (auto next_offset_curve : m_curve_to_offset_curves[next_curve])
             {
-                CagdPtStruct *intersections = CagdCrvCrvInter(offset_curve, next_offset_curve, 0.00001);
-                CagdPtStruct *intersections2 = CagdCrvCrvInter(next_offset_curve, offset_curve, 0.00001);
+                CagdPtStruct *intersections =
+                    CagdCrvCrvInter(offset_curve, next_offset_curve, INTERSECTION_PROXIMITY_THRESHOLD);
+                CagdPtStruct *intersections2 =
+                    CagdCrvCrvInter(next_offset_curve, offset_curve, INTERSECTION_PROXIMITY_THRESHOLD);
                 for (CagdPtStruct *t = intersections; t != nullptr; t = t->Pnext)
                 {
                     assert(intersections2 != nullptr);
@@ -1099,7 +1103,7 @@ void CurvesGenerator::add_surface_from_4_points(const IritPoint &p0, const IritP
     curve2->Points[2][0] = p2->Pt[1];
     curve2->Points[2][1] = p3->Pt[1];
     curve2->Points[1][1] = p3->Pt[0];
-    CagdPtStruct *intersections = CagdCrvCrvInter(curve1.get(), curve2.get(), 0.00001);
+    CagdPtStruct *intersections = CagdCrvCrvInter(curve1.get(), curve2.get(), INTERSECTION_PROXIMITY_THRESHOLD);
     if (intersections == nullptr)
     {
         add_surface_from_2_lines(p0, p1, p2, p3);
@@ -1124,7 +1128,7 @@ void CurvesGenerator::add_surface_from_2_lines(const IritPoint &line0_p0, const 
     curve2->Points[2][0] = line0_p1->Pt[1];
     curve2->Points[1][1] = line1_p1->Pt[0];
     curve2->Points[2][1] = line1_p1->Pt[1];
-    CagdPtStruct *intersections = CagdCrvCrvInter(curve1.get(), curve2.get(), 0.00001);
+    CagdPtStruct *intersections = CagdCrvCrvInter(curve1.get(), curve2.get(), INTERSECTION_PROXIMITY_THRESHOLD);
     if (intersections == nullptr)
     {
         IritSurface surface(
