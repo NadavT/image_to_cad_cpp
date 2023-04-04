@@ -311,10 +311,12 @@ void CurvesGenerator::decrease_curves_order()
 void CurvesGenerator::generate_offset_curves()
 {
     int i = 0;
-    std::mutex lock;
+    std::mutex junctions_to_curves_lock;
+    std::mutex update_lock;
+    std::mutex marked_lock;
+    std::mutex progress_lock;
     std::cout << "\t\tFinished " << i << " curves out of " << m_curves.size() << std::endl;
     std::for_each(std::execution::par, std::begin(m_curves), std::end(m_curves), [&](auto &item) {
-        lock.lock();
         const Curve &curve = std::get<0>(item);
         const Curve &width_curve = std::get<1>(item);
         const Curve &opposite_width_curve = std::get<2>(item);
@@ -322,20 +324,23 @@ void CurvesGenerator::generate_offset_curves()
         if (std::get<3>(item) != -1)
         {
             junctions.push_back(std::get<3>(item));
+            junctions_to_curves_lock.lock();
             if (m_junction_to_curves.count(std::get<3>(item)) == 0)
             {
                 m_junction_to_curves[std::get<3>(item)] = std::vector<CagdCrvStruct *>();
             }
+            junctions_to_curves_lock.unlock();
         }
         if (std::get<4>(item) != -1)
         {
             junctions.push_back(std::get<4>(item));
+            junctions_to_curves_lock.lock();
             if (m_junction_to_curves.count(std::get<4>(item)) == 0)
             {
                 m_junction_to_curves[std::get<4>(item)] = std::vector<CagdCrvStruct *>();
             }
+            junctions_to_curves_lock.unlock();
         }
-        lock.unlock();
         Curve offset_curve = Curve(SymbCrvVarOffset(curve.get(), width_curve.get(), FALSE), CagdCrvFree);
         Curve opposite_offset_curve =
             Curve(SymbCrvVarOffset(curve.get(), opposite_width_curve.get(), FALSE), CagdCrvFree);
@@ -411,25 +416,27 @@ void CurvesGenerator::generate_offset_curves()
                                       closest_point_on_boundary(p3, m_distance_to_boundary_threshold)) <
                      m_distance_in_boundary_factor * opposite_offset_curve_length))
             {
-                lock.lock();
+                update_lock.lock();
                 m_offset_curves.push_back({std::move(new_offset_curve), junctions});
                 m_offset_curves.push_back({std::move(new_opposite_offset_curve), junctions});
                 m_curve_to_offset_curves[curve.get()] = {std::get<0>(m_offset_curves.back()).get(),
                                                          std::get<0>(*std::prev(m_offset_curves.end(), 2)).get()};
-                for (const auto &junction : junctions)
-                {
-                    m_junction_to_curves[junction].push_back(curve.get());
-                }
                 if (junctions.size() == 2)
                 {
                     m_connections.insert({junctions[0], junctions[1]});
                     m_connections.insert({junctions[1], junctions[0]});
                 }
-                lock.unlock();
+                update_lock.unlock();
+                junctions_to_curves_lock.lock();
+                for (const auto &junction : junctions)
+                {
+                    m_junction_to_curves[junction].push_back(curve.get());
+                }
+                junctions_to_curves_lock.unlock();
             }
             else
             {
-                lock.lock();
+                marked_lock.lock();
                 for (const auto &junction : junctions)
                 {
                     if (m_marked_junctions.count(junction) > 0)
@@ -443,12 +450,12 @@ void CurvesGenerator::generate_offset_curves()
                 }
                 m_filtered_offset_curves.push_back({std::move(new_offset_curve), junctions});
                 m_filtered_offset_curves.push_back({std::move(new_opposite_offset_curve), junctions});
-                lock.unlock();
+                marked_lock.unlock();
             }
         }
         else
         {
-            lock.lock();
+            marked_lock.lock();
             for (const auto &junction : junctions)
             {
                 if (m_marked_junctions.count(junction) > 0)
@@ -460,13 +467,13 @@ void CurvesGenerator::generate_offset_curves()
                     m_marked_junctions[junction] = 1;
                 }
             }
-            lock.unlock();
+            marked_lock.unlock();
         }
+        progress_lock.lock();
         i++;
-        lock.lock();
         std::cout << "\x1b[A";
         std::cout << "\t\tFinished " << i << " curves out of " << m_curves.size() << std::endl;
-        lock.unlock();
+        progress_lock.unlock();
     });
 }
 
