@@ -329,6 +329,7 @@ void CurvesGenerator::generate_offset_curves()
 {
     int i = 0;
     std::mutex junctions_to_curves_lock;
+    std::mutex curves_before_trim_lock;
     std::mutex update_lock;
     std::mutex marked_lock;
     std::mutex progress_lock;
@@ -365,8 +366,10 @@ void CurvesGenerator::generate_offset_curves()
         Curve new_opposite_offset_curve =
             trim_curve_to_fit_boundary(curve, opposite_width_curve, opposite_offset_curve);
         fix_offset_curves_surface_self_intersection(new_offset_curve, new_opposite_offset_curve);
+        curves_before_trim_lock.lock();
         m_offset_curves_before_trim.push_back(std::move(offset_curve));
         m_offset_curves_before_trim.push_back(std::move(opposite_offset_curve));
+        curves_before_trim_lock.unlock();
         if (new_offset_curve != nullptr && new_opposite_offset_curve != nullptr)
         {
             bool should_filter = false;
