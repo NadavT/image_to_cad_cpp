@@ -1344,7 +1344,7 @@ void CurvesGenerator::fix_surface_orientation(IritSurface &surface, bool print_e
         surface.reset();
         return;
     }
-    if (max > 0)
+    if (max <= 0)
     {
         surface.reset(CagdSrfReverse2(surface.get()));
     }
