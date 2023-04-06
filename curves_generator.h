@@ -23,6 +23,7 @@ class CurvesGenerator
     std::vector<Curve> get_curves();
 
     void write_curves(const std::string &filename);
+    void write_offset_curves_before_trim(const std::string &filename);
     void write_offset_curves(const std::string &filename);
     void write_filtered_offset_curves(const std::string &filename);
     void write_surfaces(const std::string &filename);
@@ -64,6 +65,7 @@ class CurvesGenerator
     std::vector<std::tuple<Curve, Curve, Curve, VertexDescriptor, VertexDescriptor>> m_curves;
     int m_max_order;
     int m_target_order;
+    std::vector<Curve> m_offset_curves_before_trim;
     std::vector<OffsetCurveDetails> m_offset_curves;
     bool m_filter_offset_curves;
     std::vector<OffsetCurveDetails> m_filtered_offset_curves;

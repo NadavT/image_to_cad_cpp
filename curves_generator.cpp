@@ -77,6 +77,17 @@ void CurvesGenerator::write_curves(const std::string &filename)
     IPCloseStream(handler, TRUE);
 }
 
+void CurvesGenerator::write_offset_curves_before_trim(const std::string &filename)
+{
+    int handler = IPOpenDataFile(filename.c_str(), FALSE, TRUE);
+    for (auto &curve : m_offset_curves_before_trim)
+    {
+        char *error;
+        BzrCrvWriteToFile2(curve.get(), handler, 4, nullptr, &error);
+    }
+    IPCloseStream(handler, TRUE);
+}
+
 void CurvesGenerator::write_offset_curves(const std::string &filename)
 {
     int handler = IPOpenDataFile(filename.c_str(), FALSE, TRUE);
@@ -353,6 +364,8 @@ void CurvesGenerator::generate_offset_curves()
         Curve new_offset_curve = trim_curve_to_fit_boundary(curve, width_curve, offset_curve);
         Curve new_opposite_offset_curve =
             trim_curve_to_fit_boundary(curve, opposite_width_curve, opposite_offset_curve);
+        m_offset_curves_before_trim.push_back(std::move(offset_curve));
+        m_offset_curves_before_trim.push_back(std::move(opposite_offset_curve));
         if (new_offset_curve != nullptr && new_opposite_offset_curve != nullptr)
         {
             bool should_filter = false;
