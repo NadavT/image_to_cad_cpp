@@ -2,6 +2,7 @@
 #define MATH_H
 
 #include <cmath>
+#include <inc_irit/irit_sm.h>
 #include <opencv2/opencv.hpp>
 
 static inline double distance_squared(cv::Point p1, cv::Point p2)
