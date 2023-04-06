@@ -642,12 +642,10 @@ void CurvesGenerator::generate_surfaces_from_curves()
         CagdRType params2[2] = {offset_curve2_junction1_subdiv, offset_curve2_junction2_subdiv};
         CagdCrvStruct *sliced_offset_curve1 = CagdCrvSubdivAtParams3(offset_curve1, params1, 2, 0, FALSE, &proximity);
         CagdCrvStruct *sliced_offset_curve2 = CagdCrvSubdivAtParams3(offset_curve2, params2, 2, 0, FALSE, &proximity);
-        CagdCrvStruct *wanted_curve1 = (offset_curve1_junction1_subdiv > 0 && offset_curve1_junction1_subdiv < 0.5)
-                                           ? sliced_offset_curve1->Pnext
-                                           : sliced_offset_curve1;
-        CagdCrvStruct *wanted_curve2 = (offset_curve2_junction1_subdiv > 0 && offset_curve2_junction1_subdiv < 0.5)
-                                           ? sliced_offset_curve2->Pnext
-                                           : sliced_offset_curve2;
+        CagdCrvStruct *wanted_curve1 =
+            (offset_curve1_junction1_subdiv > 0) ? sliced_offset_curve1->Pnext : sliced_offset_curve1;
+        CagdCrvStruct *wanted_curve2 =
+            (offset_curve2_junction1_subdiv > 0) ? sliced_offset_curve2->Pnext : sliced_offset_curve2;
         IritSurface surface = IritSurface(CagdRuledSrf(wanted_curve1, wanted_curve2, 2, 2), CagdSrfFree);
         fix_surface_orientation(surface);
         if (surface != nullptr)
@@ -1269,7 +1267,7 @@ Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curv
     m_junction_radius_lock.unlock();
 
     double curve_length = CagdCrvArcLenPoly(curve.get());
-    for (double i = 0; i < 0.5; i += 1 / curve_length)
+    for (double i = 0; i < 1; i += 1 / curve_length)
     {
         CagdPtStruct *point = CagdPtNew();
         CAGD_CRV_EVAL_E2(curve.get(), i, &point->Pt[0]);
@@ -1287,7 +1285,7 @@ Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curv
             break;
         }
     }
-    for (double i = 1; i > 0.5; i -= 1 / curve_length)
+    for (double i = 1; i > 0; i -= 1 / curve_length)
     {
         CagdPtStruct *point = CagdPtNew();
         CAGD_CRV_EVAL_E2(curve.get(), i, &point->Pt[0]);
@@ -1303,7 +1301,7 @@ Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curv
             break;
         }
     }
-    if (start_point == -1 || end_point == -1)
+    if (start_point == -1 || end_point == -1 || start_point >= end_point)
     {
         return Curve(nullptr, CagdCrvFree);
     }
