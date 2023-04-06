@@ -52,6 +52,9 @@ class CurvesGenerator
     cv::Point closest_point_on_boundary(const cv::Point &point, int maximum_distance);
     int distance_in_boundary(const cv::Point &p0, const cv::Point &p1);
     Curve trim_curve_to_fit_boundary(const Curve &curve, const Curve &width_curve, const Curve &curve_to_trim);
+    void fix_offset_curves_surface_self_intersection(Curve &offset_curve, Curve &opposite_offset_curve);
+    void fix_offset_curves_surface_self_intersection(Curve &offset_curve, Curve &connection_0_curve,
+                                                     Curve &connection_1_curve);
     void fix_surface_orientation(IritSurface &surface, bool print_error = true);
     IritSurface generate_surface_from_pivot_and_points(const IritPoint &pivot, const IritPoint &p0, const IritPoint &p1,
                                                        double radius);

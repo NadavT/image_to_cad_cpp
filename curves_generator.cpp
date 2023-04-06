@@ -364,6 +364,7 @@ void CurvesGenerator::generate_offset_curves()
         Curve new_offset_curve = trim_curve_to_fit_boundary(curve, width_curve, offset_curve);
         Curve new_opposite_offset_curve =
             trim_curve_to_fit_boundary(curve, opposite_width_curve, opposite_offset_curve);
+        fix_offset_curves_surface_self_intersection(new_offset_curve, new_opposite_offset_curve);
         m_offset_curves_before_trim.push_back(std::move(offset_curve));
         m_offset_curves_before_trim.push_back(std::move(opposite_offset_curve));
         if (new_offset_curve != nullptr && new_opposite_offset_curve != nullptr)
@@ -1323,6 +1324,117 @@ Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curv
     //     sliced_curved = CrvTemp;
     // }
     return Curve(wanted_curve, CagdCrvFree);
+}
+
+void CurvesGenerator::fix_offset_curves_surface_self_intersection(Curve &offset_curve, Curve &opposite_offset_curve)
+{
+    if (offset_curve == nullptr || opposite_offset_curve == nullptr)
+    {
+        return;
+    }
+    IritPoint offset_curve_p0 = IritPoint(CagdPtNew(), CagdPtFree);
+    IritPoint offset_curve_p1 = IritPoint(CagdPtNew(), CagdPtFree);
+    IritPoint opposite_offset_curve_p0 = IritPoint(CagdPtNew(), CagdPtFree);
+    IritPoint opposite_offset_curve_p1 = IritPoint(CagdPtNew(), CagdPtFree);
+    CAGD_CRV_EVAL_E2(offset_curve.get(), 0, &offset_curve_p0.get()->Pt[0]);
+    CAGD_CRV_EVAL_E2(offset_curve.get(), 1, &offset_curve_p1.get()->Pt[0]);
+    CAGD_CRV_EVAL_E2(opposite_offset_curve.get(), 0, &opposite_offset_curve_p0.get()->Pt[0]);
+    CAGD_CRV_EVAL_E2(opposite_offset_curve.get(), 1, &opposite_offset_curve_p1.get()->Pt[0]);
+
+    Curve connection_0_curve = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
+    connection_0_curve->Points[1][0] = offset_curve_p0->Pt[0];
+    connection_0_curve->Points[2][0] = offset_curve_p0->Pt[1];
+    connection_0_curve->Points[1][1] = opposite_offset_curve_p0->Pt[0];
+    connection_0_curve->Points[2][1] = opposite_offset_curve_p0->Pt[1];
+    Curve connection_1_curve = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
+    connection_1_curve->Points[1][0] = offset_curve_p1->Pt[0];
+    connection_1_curve->Points[2][0] = offset_curve_p1->Pt[1];
+    connection_1_curve->Points[1][1] = opposite_offset_curve_p1->Pt[0];
+    connection_1_curve->Points[2][1] = opposite_offset_curve_p1->Pt[1];
+    CagdPtStruct *intersections =
+        CagdCrvCrvInter(connection_0_curve.get(), connection_1_curve.get(), INTERSECTION_PROXIMITY_THRESHOLD);
+    if (intersections == nullptr)
+    {
+        fix_offset_curves_surface_self_intersection(offset_curve, connection_0_curve, connection_1_curve);
+        fix_offset_curves_surface_self_intersection(opposite_offset_curve, connection_0_curve, connection_1_curve);
+    }
+    else
+    {
+        CagdPtFreeList(intersections);
+        connection_0_curve = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
+        connection_0_curve->Points[1][0] = offset_curve_p0->Pt[0];
+        connection_0_curve->Points[2][0] = offset_curve_p0->Pt[1];
+        connection_0_curve->Points[1][1] = opposite_offset_curve_p1->Pt[0];
+        connection_0_curve->Points[2][1] = opposite_offset_curve_p1->Pt[1];
+        connection_1_curve = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
+        connection_1_curve->Points[1][0] = offset_curve_p1->Pt[0];
+        connection_1_curve->Points[2][0] = offset_curve_p1->Pt[1];
+        connection_1_curve->Points[1][1] = opposite_offset_curve_p0->Pt[0];
+        connection_1_curve->Points[2][1] = opposite_offset_curve_p0->Pt[1];
+        intersections =
+            CagdCrvCrvInter(connection_0_curve.get(), connection_1_curve.get(), INTERSECTION_PROXIMITY_THRESHOLD);
+        if (intersections == nullptr)
+        {
+            fix_offset_curves_surface_self_intersection(offset_curve, connection_0_curve, connection_1_curve);
+            fix_offset_curves_surface_self_intersection(opposite_offset_curve, connection_1_curve, connection_0_curve);
+        }
+        else
+        {
+            std::cerr << "Error: Offset curves are self intersecting" << std::endl;
+            throw std::runtime_error("Offset curves are self intersecting");
+        }
+    }
+}
+
+void CurvesGenerator::fix_offset_curves_surface_self_intersection(Curve &offset_curve, Curve &connection_0_curve,
+                                                                  Curve &connection_1_curve)
+{
+    CagdRType tail0 = 0;
+    CagdRType tail1 = 1;
+    CagdPtStruct *intersections =
+        CagdCrvCrvInter(offset_curve.get(), connection_0_curve.get(), INTERSECTION_PROXIMITY_THRESHOLD);
+    if (intersections != nullptr)
+    {
+        for (CagdPtStruct *t = intersections; t != nullptr; t = t->Pnext)
+        {
+            tail0 = std::max(t->Pt[0], tail0);
+        }
+        CagdPtFreeList(intersections);
+    }
+    intersections = CagdCrvCrvInter(offset_curve.get(), connection_1_curve.get(), INTERSECTION_PROXIMITY_THRESHOLD);
+    if (intersections != nullptr)
+    {
+        for (CagdPtStruct *t = intersections; t != nullptr; t = t->Pnext)
+        {
+            tail1 = std::min(t->Pt[0], tail1);
+        }
+
+        CagdPtFreeList(intersections);
+    }
+    if (tail0 < 1e-10)
+    {
+        tail0 = 0;
+    }
+    if (tail1 > 1 - 1e-10)
+    {
+        tail1 = 1;
+    }
+    CagdRType params[2] = {tail0, tail1};
+    int proximity;
+    CagdCrvStruct *sliced_curved = CagdCrvSubdivAtParams3(offset_curve.get(), params, 2, 0, FALSE, &proximity);
+    CagdCrvStruct *wanted_curve = (tail0 > 0) ? sliced_curved->Pnext : sliced_curved;
+    sliced_curved->Pnext = nullptr;
+    wanted_curve->Pnext = nullptr;
+    if (tail0 > 0)
+    {
+        CagdCrvFree(sliced_curved);
+    }
+    else
+    {
+        CagdCrvFree(wanted_curve->Pnext);
+    }
+    CagdCrvSetDomain(wanted_curve, 0, 1);
+    offset_curve.reset(wanted_curve);
 }
 
 void CurvesGenerator::fix_surface_orientation(IritSurface &surface, bool print_error)
