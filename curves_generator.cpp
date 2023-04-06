@@ -947,17 +947,17 @@ std::vector<IritPoint> CurvesGenerator::get_intersection_points(
         CagdCrvStruct *choosen_curve = nullptr;
         CagdCrvStruct *choosen_next_curve = nullptr;
         CagdPtStruct *point = CagdPtNew();
-        double distance_0 =
-            distance(cv::Point(curve->Points[1][0], curve->Points[2][0]), m_graph[junction_matcher.first].p);
+        double distance_0 = distance(cv::Point2d(curve->Points[1][0], curve->Points[2][0]),
+                                     cv::Point2d(m_graph[junction_matcher.first].p));
         double distance_1 =
-            distance(cv::Point(curve->Points[1][curve->Length - 1], curve->Points[2][curve->Length - 1]),
-                     m_graph[junction_matcher.first].p);
+            distance(cv::Point2d(curve->Points[1][curve->Length - 1], curve->Points[2][curve->Length - 1]),
+                     cv::Point2d(m_graph[junction_matcher.first].p));
         CagdRType choosen_t1 = (distance_0 <= distance_1) ? 0 : 1;
-        distance_0 =
-            distance(cv::Point(next_curve->Points[1][0], next_curve->Points[2][0]), m_graph[junction_matcher.first].p);
+        distance_0 = distance(cv::Point2d(next_curve->Points[1][0], next_curve->Points[2][0]),
+                              cv::Point2d(m_graph[junction_matcher.first].p));
         distance_1 = distance(
-            cv::Point(next_curve->Points[1][next_curve->Length - 1], next_curve->Points[2][next_curve->Length - 1]),
-            m_graph[junction_matcher.first].p);
+            cv::Point2d(next_curve->Points[1][next_curve->Length - 1], next_curve->Points[2][next_curve->Length - 1]),
+            cv::Point2d(m_graph[junction_matcher.first].p));
         CagdRType choosen_t2 = (distance_0 <= distance_1) ? 0 : 1;
         CagdPtFree(point);
         for (auto offset_curve : m_curve_to_offset_curves[curve])
@@ -973,13 +973,14 @@ std::vector<IritPoint> CurvesGenerator::get_intersection_points(
                     assert(intersections2 != nullptr);
                     CagdPtStruct *point = CagdPtNew();
                     CAGD_CRV_EVAL_E2(offset_curve, t->Pt[0], &point->Pt[0]);
-                    double intersection_distance_to_junction =
-                        distance(cv::Point(point->Pt[0], point->Pt[1]), m_graph[junction_matcher.first].p);
-                    double curve_distance_to_junction_1 = distance(cv::Point(curve->Points[1][0], curve->Points[2][0]),
-                                                                   m_graph[junction_matcher.first].p);
+                    double intersection_distance_to_junction = distance(cv::Point2d(point->Pt[0], point->Pt[1]),
+                                                                        cv::Point2d(m_graph[junction_matcher.first].p));
+                    double curve_distance_to_junction_1 =
+                        distance(cv::Point2d(curve->Points[1][0], curve->Points[2][0]),
+                                 cv::Point2d(m_graph[junction_matcher.first].p));
                     double curve_distance_to_junction_2 =
-                        distance(cv::Point(curve->Points[1][curve->Length - 1], curve->Points[2][curve->Length - 1]),
-                                 m_graph[junction_matcher.first].p);
+                        distance(cv::Point2d(curve->Points[1][curve->Length - 1], curve->Points[2][curve->Length - 1]),
+                                 cv::Point2d(m_graph[junction_matcher.first].p));
                     if (t->Pt[0] > 0 && t->Pt[0] < 1 &&
                         intersection_distance_to_junction <
                             (curve_distance_to_junction_1 + curve_distance_to_junction_2) * 0.75)
@@ -1011,10 +1012,10 @@ std::vector<IritPoint> CurvesGenerator::get_intersection_points(
                                  search = search->Pnext)
                             {
                                 CAGD_CRV_EVAL_E2(next_offset_curve, search->Pt[0], &reference->Pt[0]);
-                                if (distance(cv::Point(point->Pt[0], point->Pt[1]),
-                                             cv::Point(reference->Pt[0], reference->Pt[1])) <
-                                    distance(cv::Point(point->Pt[0], point->Pt[1]),
-                                             cv::Point(best->Pt[0], best->Pt[1])))
+                                if (distance(cv::Point2d(point->Pt[0], point->Pt[1]),
+                                             cv::Point2d(reference->Pt[0], reference->Pt[1])) <
+                                    distance(cv::Point2d(point->Pt[0], point->Pt[1]),
+                                             cv::Point2d(best->Pt[0], best->Pt[1])))
                                 {
                                     t2 = search;
                                 }
@@ -1242,9 +1243,9 @@ Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curv
 {
     double start_point = -1;
     double end_point = -1;
-    cv::Point junction0(curve->Points[1][0], curve->Points[2][0]);
+    cv::Point2d junction0(curve->Points[1][0], curve->Points[2][0]);
     double junction0_radius = std::abs(width_curve->Points[1][0]) + m_junction_radius_adder;
-    cv::Point junction1(curve->Points[1][curve->Length - 1], curve->Points[2][curve->Length - 1]);
+    cv::Point2d junction1(curve->Points[1][curve->Length - 1], curve->Points[2][curve->Length - 1]);
     double junction1_radius = std::abs(width_curve->Points[1][width_curve->Length - 1]) + m_junction_radius_adder;
 
     m_junction_radius_lock.lock();
@@ -1272,7 +1273,7 @@ Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curv
     {
         CagdPtStruct *point = CagdPtNew();
         CAGD_CRV_EVAL_E2(curve.get(), i, &point->Pt[0]);
-        cv::Point p(point->Pt[0], point->Pt[1]);
+        cv::Point2d p(point->Pt[0], point->Pt[1]);
         CagdPtFree(point);
 
         // if (distance_to_boundary(p, m_distance_to_boundary_threshold) == m_distance_to_boundary_threshold)
@@ -1290,7 +1291,7 @@ Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curv
     {
         CagdPtStruct *point = CagdPtNew();
         CAGD_CRV_EVAL_E2(curve.get(), i, &point->Pt[0]);
-        cv::Point p(point->Pt[0], point->Pt[1]);
+        cv::Point2d p(point->Pt[0], point->Pt[1]);
 
         // if (distance_to_boundary(p, m_distance_to_boundary_threshold) == m_distance_to_boundary_threshold)
         // {
