@@ -1776,3 +1776,206 @@ bool CurvesGenerator::compare_point_and_curve_in_junction(
     return std::distance(a_iter, b_iter) > 0;
 }
 
+CagdRType CurvesGenerator::get_offset_curve_subdivision_param(CagdCrvStruct *offset_curve, VertexDescriptor junction)
+{
+    if (m_offset_curve_subdivision_params.count(offset_curve) > 0 &&
+        m_offset_curve_subdivision_params[offset_curve].count(junction) > 0)
+    {
+        return m_offset_curve_subdivision_params[offset_curve][junction];
+    }
+    IritPoint p0 = IritPoint(CagdPtNew(), CagdPtFree);
+    IritPoint p1 = IritPoint(CagdPtNew(), CagdPtFree);
+    CAGD_CRV_EVAL_E2(offset_curve, 0, &p0.get()->Pt[0]);
+    CAGD_CRV_EVAL_E2(offset_curve, 1, &p1.get()->Pt[0]);
+    return (distance(cv::Point2d(p0.get()->Pt[0], p0.get()->Pt[1]), cv::Point2d(m_graph[junction].p)) >
+            distance(cv::Point2d(p1.get()->Pt[0], p1.get()->Pt[1]), cv::Point2d(m_graph[junction].p)))
+               ? 1
+               : 0;
+}
+
+std::vector<IritPoint> CurvesGenerator::get_neighborhood_points(
+    const std::unordered_set<VertexDescriptor> &neighborhood)
+{
+    std::unordered_map<VertexDescriptor, std::vector<std::variant<IritPoint, CagdCrvStruct *>>> neighborhood_points;
+    m_point_to_originating_curve.clear();
+    for (const auto &junction : neighborhood)
+    {
+        std::vector<std::variant<IritPoint, CagdCrvStruct *>> junction_reference;
+        std::unordered_map<cv::Point, CagdPtStruct *> unique_points;
+        for (const auto &curve : m_junction_to_curves[junction])
+        {
+            if (m_curve_to_offset_curves.count(curve) == 0 || m_curve_to_offset_curves[curve].empty())
+            {
+                junction_reference.push_back(curve);
+            }
+            else
+            {
+                for (const auto &offset_curve : m_curve_to_offset_curves[curve])
+                {
+                    IritPoint p = IritPoint(CagdPtNew(), CagdPtFree);
+                    CAGD_CRV_EVAL_E2(offset_curve, get_offset_curve_subdivision_param(offset_curve, junction),
+                                     &p.get()->Pt[0]);
+                    if (unique_points.count(cv::Point(p.get()->Pt[0], p.get()->Pt[1])) == 0)
+                    {
+                        unique_points[cv::Point(p.get()->Pt[0], p.get()->Pt[1])] = p.get();
+                        m_point_to_originating_curve[p.get()] = {std::make_tuple(
+                            curve, offset_curve, get_offset_curve_subdivision_param(offset_curve, junction))};
+                        junction_reference.push_back(std::move(p));
+                    }
+                    else
+                    {
+                        CagdPtStruct *point = unique_points[cv::Point(p.get()->Pt[0], p.get()->Pt[1])];
+                        m_point_to_originating_curve[point].push_back(std::make_tuple(
+                            curve, offset_curve, get_offset_curve_subdivision_param(offset_curve, junction)));
+                    }
+                }
+            }
+        }
+        std::sort(junction_reference.begin(), junction_reference.end(), [this, junction](const auto &a, const auto &b) {
+            if (std::holds_alternative<IritPoint>(a) && std::holds_alternative<IritPoint>(b))
+            {
+                return compare_two_points_in_junction(std::get<IritPoint>(a), std::get<IritPoint>(b),
+                                                      *m_junction_to_curves.find(junction));
+            }
+            if (std::holds_alternative<IritPoint>(a) && std::holds_alternative<CagdCrvStruct *>(b))
+            {
+                return compare_point_and_curve_in_junction(std::get<IritPoint>(a), std::get<CagdCrvStruct *>(b),
+                                                           *m_junction_to_curves.find(junction));
+            }
+            if (std::holds_alternative<CagdCrvStruct *>(a) && std::holds_alternative<IritPoint>(b))
+            {
+                return !compare_point_and_curve_in_junction(std::get<IritPoint>(b), std::get<CagdCrvStruct *>(a),
+                                                            *m_junction_to_curves.find(junction));
+            }
+            if (std::holds_alternative<CagdCrvStruct *>(a) && std::holds_alternative<CagdCrvStruct *>(b))
+            {
+                return compare_two_curves_in_junction(std::get<CagdCrvStruct *>(a), std::get<CagdCrvStruct *>(b),
+                                                      *m_junction_to_curves.find(junction));
+            }
+            std::cerr << "ERROR: Invalid variant type" << std::endl;
+            throw std::runtime_error("Invalid variant type");
+        });
+        neighborhood_points[junction] = std::move(junction_reference);
+#ifdef DEBUG_NEIGHBORHOOD_JUNCTION_SORT
+        std::cout << "\t\t\tJunction " << m_graph[junction].p << " order:" << std::endl;
+        for (const auto &point : neighborhood_points[junction])
+        {
+            if (std::holds_alternative<IritPoint>(point))
+            {
+                std::cout << "\t\t\t\tPoint: " << std::get<IritPoint>(point).get()->Pt[0] << ", "
+                          << std::get<IritPoint>(point).get()->Pt[1] << std::endl;
+            }
+            else
+            {
+                CagdCrvStruct *curve = std::get<CagdCrvStruct *>(point);
+                std::cout << "\t\t\t\tCurve: " << curve->Points[1][0] << ", " << curve->Points[2][0] << " - "
+                          << curve->Points[1][curve->Length - 1] << ", " << curve->Points[2][curve->Length - 1]
+                          << std::endl;
+            }
+        }
+#endif // DEBUG_NEIGHBORHOOD_JUNCTION_SORT
+    }
+
+    std::vector<IritPoint> neighborhood_points_vector;
+    const std::variant<IritPoint, CagdCrvStruct *> *first_point = nullptr;
+    VertexDescriptor first_junction;
+    for (const auto &junction : neighborhood)
+    {
+        for (const auto &point : neighborhood_points[junction])
+        {
+            if (std::holds_alternative<IritPoint>(point))
+            {
+                first_point = &point;
+                first_junction = junction;
+            }
+        }
+    }
+    if (first_point == nullptr)
+    {
+        std::cerr << "ERROR: No points in neighborhood" << std::endl;
+        return std::vector<IritPoint>();
+    }
+    neighborhood_points_vector.push_back(IritPoint(CagdPtCopy(std::get<IritPoint>(*first_point).get()), CagdPtFree));
+    auto first_iter =
+        std::find(neighborhood_points[first_junction].begin(), neighborhood_points[first_junction].end(), *first_point);
+    assert(first_iter != neighborhood_points[first_junction].end());
+    VertexDescriptor current_junction = first_junction;
+    auto current_iter = ++first_iter;
+    const std::variant<IritPoint, CagdCrvStruct *> *last_point = first_point;
+    std::unordered_set<const std::variant<IritPoint, CagdCrvStruct *> *> visited_points = {first_point};
+
+#ifdef DEBUG_NEIGHBORHOOD_SORT
+    std::cout << "\t\tStart of sorting neighborhood points" << std::endl;
+    std::cout << "\t\t\tPoint: " << std::get<IritPoint>(*first_point).get()->Pt[0] << ", "
+              << std::get<IritPoint>(*first_point).get()->Pt[1] << std::endl;
+#endif // DEBUG_NEIGHBORHOOD_SORT
+
+    if (current_iter == neighborhood_points[current_junction].end())
+    {
+        current_iter = neighborhood_points[current_junction].begin();
+    }
+    do
+    {
+        if (std::holds_alternative<IritPoint>(*current_iter))
+        {
+            if (&(*current_iter) != last_point)
+            {
+#ifdef DEBUG_NEIGHBORHOOD_SORT
+                std::cout << "\t\t\tPoint: " << std::get<IritPoint>(*current_iter).get()->Pt[0] << ", "
+                          << std::get<IritPoint>(*current_iter).get()->Pt[1] << std::endl;
+#endif // DEBUG_NEIGHBORHOOD_SORT
+                if (visited_points.count(&(*current_iter)) != 0)
+                {
+                    std::cerr << "ERROR: Unexpected inner loop, can't fill hole" << std::endl;
+                    return std::vector<IritPoint>();
+                }
+                neighborhood_points_vector.push_back(
+                    IritPoint(CagdPtCopy(std::get<IritPoint>(*current_iter).get()), CagdPtFree));
+                last_point = &(*current_iter);
+                visited_points.insert(last_point);
+            }
+        }
+        else
+        {
+            CagdCrvStruct *curve = std::get<CagdCrvStruct *>(*current_iter);
+#ifdef DEBUG_NEIGHBORHOOD_SORT
+            std::cout << "\t\t\tCurve: " << curve->Points[1][0] << ", " << curve->Points[2][0] << " - "
+                      << curve->Points[1][curve->Length - 1] << ", " << curve->Points[2][curve->Length - 1]
+                      << std::endl;
+#endif // DEBUG_NEIGHBORHOOD_SORT
+            if (m_curve_to_offset_curves.count(curve) != 0 && !m_curve_to_offset_curves[curve].empty())
+            {
+                std::cerr << "ERROR: Invalid curve in neighborhood" << std::endl;
+                throw std::runtime_error("Invalid curve in neighborhood");
+            }
+            for (const auto &junction : m_curve_to_junctions[curve])
+            {
+                if (junction != current_junction)
+                {
+                    current_junction = junction;
+                    break;
+                }
+            }
+            auto iter = std::find(neighborhood_points[current_junction].begin(),
+                                  neighborhood_points[current_junction].end(), *current_iter);
+            if (iter == neighborhood_points[current_junction].end())
+            {
+                std::cerr << "ERROR: Invalid curve in neighborhood" << std::endl;
+                throw std::runtime_error("Invalid curve in neighborhood");
+            }
+            current_iter = iter;
+        }
+        ++current_iter;
+        if (current_iter == neighborhood_points[current_junction].end())
+        {
+            current_iter = neighborhood_points[current_junction].begin();
+        }
+    } while (std::holds_alternative<CagdCrvStruct *>(*current_iter) ||
+             std::get<IritPoint>(*current_iter) != std::get<IritPoint>(*first_point));
+
+#ifdef DEBUG_NEIGHBORHOOD_SORT
+    std::cout << "\t\tEnd of sorting neighborhood points" << std::endl;
+#endif // DEBUG_NEIGHBORHOOD_SORT
+
+    return neighborhood_points_vector;
+}
