@@ -62,6 +62,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     TIMED_INNER_FUNCTION(sort_junction_curves(), "Sorting junction curves");
     TIMED_INNER_FUNCTION(generate_surfaces_from_junctions(), "Generating surfaces from junctions");
     TIMED_INNER_FUNCTION(find_neighborhoods_intersections(), "Finding neighborhoods intersections");
+    TIMED_INNER_FUNCTION(fill_holes(), "Filling holes");
     TIMED_INNER_FUNCTION(generate_surfaces_from_curves(), "Generating surfaces from curves");
     TIMED_INNER_FUNCTION(extrude_surfaces(), "Extruding surfaces");
 }
@@ -758,15 +759,12 @@ void CurvesGenerator::fill_holes()
             continue;
         }
         const auto &junction = item.first;
-        std::vector<IritPoint> points;
         std::unordered_set<VertexDescriptor> neighborhood = get_marked_neighborhood(junction);
         std::unordered_set<cv::Point> unique_points;
+#ifdef DEBUG_NEIGHBORHOOD
         std::cout << "\t\tNeighborhood of junction " << m_graph[junction].p << " has " << neighborhood.size()
                   << " elements" << std::endl;
-        for (const auto &neighbor : neighborhood)
-        {
-            std::cout << "\t\t\tNeighbor: " << m_graph[neighbor].p << std::endl;
-        }
+#endif
         for (const auto &neighbor : neighborhood)
         {
             assert(passed_junctions.count(neighbor) == 0);
@@ -776,77 +774,24 @@ void CurvesGenerator::fill_holes()
                 throw std::runtime_error("Neighbor was already processed");
             }
             passed_junctions.insert(neighbor);
-            const auto &curves = m_junction_to_curves[neighbor];
-            for (const auto &curve : curves)
-            {
-                const auto &offset_curves = m_curve_to_offset_curves[curve];
-                IritPoint p0 = IritPoint(CagdPtNew(), CagdPtFree);
-                IritPoint p1 = IritPoint(CagdPtNew(), CagdPtFree);
-                assert(offset_curves.size() == 2);
-                CAGD_CRV_EVAL_E2(offset_curves[0], 0, &p0.get()->Pt[0]);
-                CAGD_CRV_EVAL_E2(offset_curves[0], 1, &p1.get()->Pt[0]);
-                CagdRType offset_curve1_junction_subdiv =
-                    (distance(cv::Point(p0.get()->Pt[0], p0.get()->Pt[1]), m_graph[neighbor].p) >
-                     distance(cv::Point(p1.get()->Pt[0], p1.get()->Pt[1]), m_graph[neighbor].p))
-                        ? 1
-                        : 0;
-                CAGD_CRV_EVAL_E2(offset_curves[1], 0, &p0.get()->Pt[0]);
-                CAGD_CRV_EVAL_E2(offset_curves[1], 1, &p1.get()->Pt[0]);
-                CagdRType offset_curve2_junction_subdiv =
-                    (distance(cv::Point(p0.get()->Pt[0], p0.get()->Pt[1]), m_graph[neighbor].p) >
-                     distance(cv::Point(p1.get()->Pt[0], p1.get()->Pt[1]), m_graph[neighbor].p))
-                        ? 1
-                        : 0;
-                if (offset_curves.size() != 2)
-                {
-                    std::cerr << "ERROR: Invalid offset curves" << std::endl;
-                    throw std::runtime_error("Invalid offset curves");
-                }
-                if (m_offset_curve_subdivision_params.count(offset_curves[0]) > 0 &&
-                    m_offset_curve_subdivision_params[offset_curves[0]].count(neighbor) > 0)
-                {
-                    offset_curve1_junction_subdiv = m_offset_curve_subdivision_params[offset_curves[0]][neighbor];
-                }
-                if (m_offset_curve_subdivision_params.count(offset_curves[1]) > 0 &&
-                    m_offset_curve_subdivision_params[offset_curves[1]].count(neighbor) > 0)
-                {
-                    offset_curve2_junction_subdiv = m_offset_curve_subdivision_params[offset_curves[1]][neighbor];
-                }
-                CAGD_CRV_EVAL_E2(offset_curves[0], offset_curve1_junction_subdiv, &p0.get()->Pt[0]);
-                CAGD_CRV_EVAL_E2(offset_curves[1], offset_curve2_junction_subdiv, &p1.get()->Pt[0]);
-                if (unique_points.count(cv::Point(p0.get()->Pt[0], p0.get()->Pt[1])) == 0)
-                {
-                    unique_points.insert(cv::Point(p0.get()->Pt[0], p0.get()->Pt[1]));
-                    points.push_back(std::move(p0));
-                }
-                if (unique_points.count(cv::Point(p1.get()->Pt[0], p1.get()->Pt[1])) == 0)
-                {
-                    unique_points.insert(cv::Point(p1.get()->Pt[0], p1.get()->Pt[1]));
-                    points.push_back(std::move(p1));
-                }
-            }
+#ifdef DEBUG_NEIGHBORHOOD
+            std::cout << "\t\t\tNeighbor: " << m_graph[neighbor].p << std::endl;
+#endif
         }
+
+        std::vector<IritPoint> points = get_neighborhood_points(neighborhood);
 
         if (points.size() == 0)
         {
             continue;
         }
-        cv::Point2d pivot = std::accumulate(points.begin(), points.end(), cv::Point2d(0, 0),
-                                            [](const cv::Point2d &a, const IritPoint &b) {
-                                                return cv::Point2d(a.x + b.get()->Pt[0], a.y + b.get()->Pt[1]);
-                                            });
-        pivot.x /= points.size();
-        pivot.y /= points.size();
-        std::sort(points.begin(), points.end(), [&pivot](const IritPoint &a, const IritPoint &b) {
-            return std::atan2(a.get()->Pt[1] - pivot.y, a.get()->Pt[0] - pivot.x) <
-                   std::atan2(b.get()->Pt[1] - pivot.y, b.get()->Pt[0] - pivot.x);
-        });
+#ifdef DEBUG_NEIGHBORHOOD
         std::cout << "\t\tFilling hole with " << points.size() << " points:" << std::endl;
-        std::cout << "\t\t\tPivot: (" << pivot.x << ", " << pivot.y << ")" << std::endl;
         for (const auto &point : points)
         {
             std::cout << "\t\t\t(" << point.get()->Pt[0] << ", " << point.get()->Pt[1] << ")" << std::endl;
         }
+#endif
         IPVertexStruct *first_vertex = nullptr;
         IPVertexStruct *last_vertex = nullptr;
         for (const auto &point : points)
@@ -863,54 +808,19 @@ void CurvesGenerator::fill_holes()
         }
         last_vertex->Pnext = first_vertex;
         IPPolygonStruct *polygon = IPAllocPolygon(0, first_vertex, nullptr);
+        IPUpdatePolyPlane(polygon);
+        IPObjectStruct *object = IPGenPOLYObject(polygon);
+        IPPutObjectToFile3(
+            ("polygons/" + std::to_string(points[0]->Pt[0]) + "," + std::to_string(points[0]->Pt[1]) + ".itd").c_str(),
+            object, 0);
         IPPolygonStruct *polygons = GMSplitNonConvexPoly(polygon, FALSE);
-        CagdPolygonStruct *cagd_polygons = IPIritPlgns2CagdPlgns(polygons);
-        for (CagdPolygonStruct *polygon = cagd_polygons; polygon != nullptr; polygon = polygon->Pnext)
-        {
-            std::cout << "\t\tPolygon:" << std::endl;
-            if (polygon->PolyType == CAGD_POLYGON_TYPE_POLYSTRIP)
-            {
-                std::cerr << "ERROR: Polygon strip" << std::endl;
-                throw std::runtime_error("Polygon strip");
-            }
-            else if (polygon->PolyType == CAGD_POLYGON_TYPE_TRIANGLE)
-            {
-                CagdPtStruct points[3] = {0};
-                for (int i = 0; i < 3; ++i)
-                {
-                    points[i].Pt[0] = polygon->U.Polygon[i].Pt[0];
-                    points[i].Pt[1] = polygon->U.Polygon[i].Pt[1];
-                    points[i].Pt[2] = polygon->U.Polygon[i].Pt[2];
-                    std::cout << "\t\t\t(" << points[i].Pt[0] << ", " << points[i].Pt[1] << ")" << std::endl;
-                }
-                IritSurface surface = IritSurface(
-                    CagdBilinearSrf(&points[0], &points[1], &points[2], &points[1], CAGD_PT_E2_TYPE), CagdSrfFree);
-                fix_surface_orientation(surface);
-                if (surface != nullptr)
-                {
-                    m_surfaces.push_back(std::move(surface));
-                }
-            }
-            else if (polygon->PolyType == CAGD_POLYGON_TYPE_RECTANGLE)
-            {
-                IritPoint points[4] = {IritPoint(CagdPtNew(), CagdPtFree), IritPoint(CagdPtNew(), CagdPtFree),
-                                       IritPoint(CagdPtNew(), CagdPtFree), IritPoint(CagdPtNew(), CagdPtFree)};
-                for (int i = 0; i < 4; ++i)
-                {
-                    points[i]->Pt[0] = polygon->U.Polygon[i].Pt[0];
-                    points[i]->Pt[1] = polygon->U.Polygon[i].Pt[1];
-                    points[i]->Pt[2] = polygon->U.Polygon[i].Pt[2];
-                    std::cout << "\t\t\t(" << points[i]->Pt[0] << ", " << points[i]->Pt[1] << ")" << std::endl;
-                }
-                add_surface_from_4_points(points[0], points[1], points[2], points[3]);
-            }
-            else
-            {
-                std::cerr << "ERROR: Unknown polygon type" << std::endl;
-                throw std::runtime_error("Unknown polygon type");
-            }
-        }
-        CagdPolygonFreeList(cagd_polygons);
+        IPFreePolygon(polygon);
+        object = IPGenPOLYObject(polygons);
+        IPPutObjectToFile3(
+            ("splitted_polygons/" + std::to_string(points[0]->Pt[0]) + "," + std::to_string(points[0]->Pt[1]) + ".itd")
+                .c_str(),
+            object, 0);
+        IPFreePolygonList(polygons);
     }
 }
 
