@@ -36,6 +36,7 @@ class CurvesGenerator
     void generate_offset_curves();
     void sort_junction_curves();
     void generate_surfaces_from_junctions();
+    void find_neighborhoods_intersections();
     void generate_surfaces_from_curves();
     void fill_holes();
     void extrude_surfaces();

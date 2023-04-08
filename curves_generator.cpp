@@ -61,7 +61,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     TIMED_INNER_FUNCTION(generate_offset_curves(), "Generating offset curves");
     TIMED_INNER_FUNCTION(sort_junction_curves(), "Sorting junction curves");
     TIMED_INNER_FUNCTION(generate_surfaces_from_junctions(), "Generating surfaces from junctions");
-    // TIMED_INNER_FUNCTION(fill_holes(), "Filling holes");
+    TIMED_INNER_FUNCTION(find_neighborhoods_intersections(), "Finding neighborhoods intersections");
     TIMED_INNER_FUNCTION(generate_surfaces_from_curves(), "Generating surfaces from curves");
     TIMED_INNER_FUNCTION(extrude_surfaces(), "Extruding surfaces");
 }
@@ -545,6 +545,8 @@ void CurvesGenerator::generate_surfaces_from_junctions()
         {
             continue;
         }
+        m_point_to_originating_curve.clear();
+        std::vector<IritPoint> points = get_intersection_points(junction_matcher);
         if (points.size() == 3)
         {
             IritSurface surface = IritSurface(
@@ -598,6 +600,86 @@ void CurvesGenerator::generate_surfaces_from_junctions()
                     }
                 }
             }
+        }
+    }
+}
+
+void CurvesGenerator::find_neighborhoods_intersections()
+{
+    std::unordered_set<VertexDescriptor> passed_junctions;
+    for (const auto &item : m_marked_junctions)
+    {
+        if (passed_junctions.count(item.first) > 0)
+        {
+            continue;
+        }
+        const auto &junction = item.first;
+        std::vector<IritPoint> points;
+        std::unordered_set<VertexDescriptor> neighborhood = get_marked_neighborhood(junction);
+        std::unordered_set<cv::Point> unique_points;
+        // std::cout << "\t\tNeighborhood of junction " << m_graph[junction].p << " has " << neighborhood.size()
+        //           << " elements" << std::endl;
+        // for (const auto &neighbor : neighborhood)
+        // {
+        //     std::cout << "\t\t\tNeighbor: " << m_graph[neighbor].p << std::endl;
+        // }
+
+        std::vector<std::tuple<VertexDescriptor, CagdCrvStruct *, CagdCrvStruct *>> neighborhood_curves;
+        std::vector<CagdCrvStruct *> neighborhood_offset_curves;
+        for (const auto &neighbor : neighborhood)
+        {
+            assert(passed_junctions.count(neighbor) == 0);
+            if (passed_junctions.count(neighbor) > 0)
+            {
+                std::cerr << "ERROR: Neighbor was already processed" << std::endl;
+                throw std::runtime_error("Neighbor was already processed");
+            }
+            passed_junctions.insert(neighbor);
+            for (const auto &curve : m_junction_to_curves[neighbor])
+            {
+                if (m_curve_to_offset_curves[curve].size() == 2)
+                {
+                    neighborhood_curves.push_back(std::make_tuple(neighbor, curve, m_curve_to_offset_curves[curve][0]));
+                    neighborhood_curves.push_back(std::make_tuple(neighbor, curve, m_curve_to_offset_curves[curve][1]));
+                    neighborhood_offset_curves.push_back(m_curve_to_offset_curves[curve][0]);
+                    neighborhood_offset_curves.push_back(m_curve_to_offset_curves[curve][1]);
+                }
+            }
+        }
+        for (const auto &curve_item : neighborhood_curves)
+        {
+            VertexDescriptor junction = std::get<0>(curve_item);
+            CagdCrvStruct *curve = std::get<1>(curve_item);
+            CagdCrvStruct *offset_curve = std::get<2>(curve_item);
+            double distance_0 =
+                distance(cv::Point2d(curve->Points[1][0], curve->Points[2][0]), cv::Point2d(m_graph[junction].p));
+            double distance_1 =
+                distance(cv::Point2d(curve->Points[1][curve->Length - 1], curve->Points[2][curve->Length - 1]),
+                         cv::Point2d(m_graph[junction].p));
+            CagdRType choosen_t = (distance_0 <= distance_1) ? 0 : 1;
+            bool t_is_tail = (choosen_t == 1);
+            for (const auto &second_offset_curve : neighborhood_offset_curves)
+            {
+                if (offset_curve == second_offset_curve)
+                {
+                    continue;
+                }
+                CagdPtStruct *intersections =
+                    CagdCrvCrvInter(offset_curve, second_offset_curve, INTERSECTION_PROXIMITY_THRESHOLD);
+                for (CagdPtStruct *t = intersections; t != nullptr; t = t->Pnext)
+                {
+                    if (t->Pt[0] > 0 && t->Pt[0] < 1)
+                    {
+                        CagdRType sub1 = (t_is_tail) ? 1 - t->Pt[0] : t->Pt[0];
+                        CagdRType sub2 = (t_is_tail) ? 1 - choosen_t : choosen_t;
+                        if (sub1 > sub2)
+                        {
+                            choosen_t = t->Pt[0];
+                        }
+                    }
+                }
+            }
+            m_offset_curve_subdivision_params[offset_curve][junction] = choosen_t;
         }
     }
 }
@@ -962,6 +1044,7 @@ std::vector<IritPoint> CurvesGenerator::get_intersection_points(
             cv::Point2d(m_graph[junction_matcher.first].p));
         CagdRType choosen_t2 = (distance_0 <= distance_1) ? 0 : 1;
         CagdPtFree(point);
+        bool t1_is_tail = (choosen_t1 == 1);
         for (auto offset_curve : m_curve_to_offset_curves[curve])
         {
             for (auto next_offset_curve : m_curve_to_offset_curves[next_curve])
@@ -991,8 +1074,8 @@ std::vector<IritPoint> CurvesGenerator::get_intersection_points(
                         {
                             // std::cerr << "Found more than one intersection in junction" << std::endl;
                         }
-                        CagdRType sub1 = std::min(t->Pt[0], 1 - t->Pt[0]);
-                        CagdRType sub2 = std::min(choosen_t1, 1 - choosen_t1);
+                        CagdRType sub1 = (t1_is_tail) ? 1 - t->Pt[0] : t->Pt[0];
+                        CagdRType sub2 = (t1_is_tail) ? 1 - choosen_t1 : choosen_t1;
                         if (sub1 > sub2)
                         {
                             if (curve_to_subdiv.count(offset_curve) > 0)
@@ -1230,7 +1313,6 @@ int CurvesGenerator::distance_in_boundary(const cv::Point &p0, const cv::Point &
     auto target = point_to_index(p1, m_reference_image.cols);
 
     std::vector<int> distances(boost::num_vertices(m_image_graph));
-    auto recorder = boost::record_distances(distances.data(), boost::on_tree_edge{});
 
     std::vector<VertexDescriptor> p(boost::num_vertices(m_image_graph));
     std::vector<double> d(boost::num_vertices(m_image_graph));
