@@ -539,8 +539,6 @@ void CurvesGenerator::generate_surfaces_from_junctions()
         {
             continue;
         }
-        m_point_to_originating_curve.clear();
-        std::vector<IritPoint> points = get_intersection_points(junction_matcher);
         if (m_marked_junctions.count(junction_matcher.first) > 0) // && m_marked_junctions[junction_matcher.first] > 1)
         {
             continue;
@@ -672,14 +670,29 @@ void CurvesGenerator::find_neighborhoods_intersections()
                     {
                         CagdRType sub1 = (t_is_tail) ? 1 - t->Pt[0] : t->Pt[0];
                         CagdRType sub2 = (t_is_tail) ? 1 - choosen_t : choosen_t;
-                        if (sub1 > sub2)
+                        if ((sub1 < 0.5 || (t_is_tail && sub1 == 0.5)) && sub1 > sub2)
                         {
                             choosen_t = t->Pt[0];
                         }
                     }
                 }
             }
-            m_offset_curve_subdivision_params[offset_curve][junction] = choosen_t;
+            if (m_offset_curve_subdivision_params.count(offset_curve) > 0 &&
+                m_offset_curve_subdivision_params[offset_curve].count(junction) > 0)
+            {
+
+                CagdRType sub1 = (t_is_tail) ? 1 - choosen_t : choosen_t;
+                CagdRType sub2 = (t_is_tail) ? 1 - m_offset_curve_subdivision_params[offset_curve][junction]
+                                             : m_offset_curve_subdivision_params[offset_curve][junction];
+                if ((sub1 < 0.5 || (t_is_tail && sub1 == 0.5)) && sub1 > sub2)
+                {
+                    m_offset_curve_subdivision_params[offset_curve][junction] = choosen_t;
+                }
+            }
+            else
+            {
+                m_offset_curve_subdivision_params[offset_curve][junction] = choosen_t;
+            }
         }
     }
 }
@@ -1076,7 +1089,7 @@ std::vector<IritPoint> CurvesGenerator::get_intersection_points(
                         }
                         CagdRType sub1 = (t1_is_tail) ? 1 - t->Pt[0] : t->Pt[0];
                         CagdRType sub2 = (t1_is_tail) ? 1 - choosen_t1 : choosen_t1;
-                        if (sub1 > sub2)
+                        if ((sub1 < 0.5 || (t1_is_tail && sub1 == 0.5)) && sub1 > sub2)
                         {
                             if (curve_to_subdiv.count(offset_curve) > 0)
                             {
