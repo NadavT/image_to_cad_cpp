@@ -65,6 +65,12 @@ class CurvesGenerator
     bool compare_two_points_in_junction(
         const IritPoint &a, const IritPoint &b,
         const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher);
+    bool compare_two_curves_in_junction(
+        const CagdCrvStruct *a, const CagdCrvStruct *b,
+        const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher);
+    bool compare_point_and_curve_in_junction(
+        const IritPoint &a, const CagdCrvStruct *b,
+        const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher);
 
   private:
     Graph &m_graph;
