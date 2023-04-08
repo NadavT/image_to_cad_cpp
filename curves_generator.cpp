@@ -1206,26 +1206,19 @@ std::vector<IritPoint> CurvesGenerator::get_intersection_points(
 void CurvesGenerator::add_surface_from_4_points(const IritPoint &p0, const IritPoint &p1, const IritPoint &p2,
                                                 const IritPoint &p3)
 {
-    Curve curve1 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
-    curve1->Points[1][0] = p0->Pt[0];
-    curve1->Points[2][0] = p0->Pt[1];
-    curve1->Points[1][1] = p1->Pt[0];
-    curve1->Points[2][1] = p1->Pt[1];
-    Curve curve2 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
-    curve2->Points[1][0] = p2->Pt[0];
-    curve2->Points[2][0] = p2->Pt[1];
-    curve2->Points[2][1] = p3->Pt[1];
-    curve2->Points[1][1] = p3->Pt[0];
-    CagdPtStruct *intersections = CagdCrvCrvInter(curve1.get(), curve2.get(), INTERSECTION_PROXIMITY_THRESHOLD);
-    if (intersections == nullptr)
+    std::vector<CagdPtStruct *> points = {p0.get(), p1.get(), p2.get(), p3.get()};
+    do
     {
-        add_surface_from_2_lines(p0, p1, p2, p3);
-    }
-    else
-    {
-        add_surface_from_2_lines(p0, p2, p1, p3);
-    }
-    CagdPtFreeList(intersections);
+        IritSurface surface(CagdBilinearSrf(points[0], points[1], points[2], points[3], CAGD_PT_E2_TYPE), CagdSrfFree);
+        fix_surface_orientation(surface, false);
+        if (surface != nullptr)
+        {
+            m_surfaces.push_back(std::move(surface));
+            return;
+        }
+    } while (std::next_permutation(points.begin(), points.end()));
+    std::cerr << "Failed to create surface" << std::endl;
+    return;
 }
 
 void CurvesGenerator::add_surface_from_2_lines(const IritPoint &line0_p0, const IritPoint &line0_p1,
