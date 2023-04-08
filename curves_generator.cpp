@@ -359,6 +359,14 @@ void CurvesGenerator::generate_offset_curves()
             }
             junctions_to_curves_lock.unlock();
         }
+        junctions_to_curves_lock.lock();
+        m_curve_to_junctions[curve.get()] = junctions;
+        for (const auto &junction : junctions)
+        {
+            m_junction_to_curves[junction].push_back(curve.get());
+        }
+        junctions_to_curves_lock.unlock();
+
         Curve offset_curve = Curve(SymbCrvVarOffset(curve.get(), width_curve.get(), FALSE), CagdCrvFree);
         Curve opposite_offset_curve =
             Curve(SymbCrvVarOffset(curve.get(), opposite_width_curve.get(), FALSE), CagdCrvFree);

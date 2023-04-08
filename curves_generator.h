@@ -78,6 +78,7 @@ class CurvesGenerator
     std::vector<OffsetCurveDetails> m_filtered_offset_curves;
     OffsetCurveMatcher m_curve_to_offset_curves;
     std::unordered_map<VertexDescriptor, std::vector<CagdCrvStruct *>> m_junction_to_curves;
+    std::unordered_map<CagdCrvStruct *, std::vector<VertexDescriptor>> m_curve_to_junctions;
     std::set<std::pair<VertexDescriptor, VertexDescriptor>> m_connections;
     std::unordered_map<VertexDescriptor, unsigned int> m_marked_junctions;
     std::unordered_map<CagdCrvStruct *, std::unordered_map<VertexDescriptor, CagdRType>>
