@@ -463,12 +463,6 @@ void CurvesGenerator::generate_offset_curves()
                     m_connections.insert({junctions[1], junctions[0]});
                 }
                 update_lock.unlock();
-                junctions_to_curves_lock.lock();
-                for (const auto &junction : junctions)
-                {
-                    m_junction_to_curves[junction].push_back(curve.get());
-                }
-                junctions_to_curves_lock.unlock();
             }
             else
             {
@@ -620,14 +614,6 @@ void CurvesGenerator::find_neighborhoods_intersections()
         const auto &junction = item.first;
         std::vector<IritPoint> points;
         std::unordered_set<VertexDescriptor> neighborhood = get_marked_neighborhood(junction);
-        std::unordered_set<cv::Point> unique_points;
-        // std::cout << "\t\tNeighborhood of junction " << m_graph[junction].p << " has " << neighborhood.size()
-        //           << " elements" << std::endl;
-        // for (const auto &neighbor : neighborhood)
-        // {
-        //     std::cout << "\t\t\tNeighbor: " << m_graph[neighbor].p << std::endl;
-        // }
-
         std::vector<std::tuple<VertexDescriptor, CagdCrvStruct *, CagdCrvStruct *>> neighborhood_curves;
         std::vector<CagdCrvStruct *> neighborhood_offset_curves;
         for (const auto &neighbor : neighborhood)
