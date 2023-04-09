@@ -779,7 +779,8 @@ void CurvesGenerator::fill_holes()
 #endif
         }
 
-        std::vector<IritPoint> points = get_neighborhood_points(neighborhood);
+        std::vector<CagdCrvStruct *> neighborhood_offset_curves;
+        std::vector<IritPoint> points = get_neighborhood_points(neighborhood, neighborhood_offset_curves);
 
         if (points.size() == 0)
         {
@@ -829,9 +830,52 @@ void CurvesGenerator::fill_holes()
                 current_point.get()->Pt[0] = current_vertex->Coord[0];
                 current_point.get()->Pt[1] = current_vertex->Coord[1];
                 current_point.get()->Pt[2] = 0;
-                IritSurface surface = IritSurface(
-                    CagdBilinearSrf(prev_point.get(), pivot.get(), current_point.get(), pivot.get(), CAGD_PT_E2_TYPE),
-                    CagdSrfFree);
+                CagdCrvStruct *relative_curve;
+                CagdRType t0;
+                CagdRType t1;
+                std::tie(relative_curve, t0, t1) =
+                    get_points_matching_curve(neighborhood_offset_curves, prev_point, current_point);
+                IritSurface surface = IritSurface(nullptr, CagdSrfFree);
+                if (relative_curve != nullptr)
+                {
+                    if ((t0 < 0.01 || 1 - t0 < 0.01) && (t1 < 0.01 || 1 - t1 < 0.01))
+                    {
+                        prev_point->Pt[0] = relative_curve->Points[1][0];
+                        prev_point->Pt[1] = relative_curve->Points[2][0];
+                        current_point->Pt[0] = relative_curve->Points[1][relative_curve->Length - 1];
+                        current_point->Pt[1] = relative_curve->Points[2][relative_curve->Length - 1];
+                        Curve a = Curve(CagdMergePtPtLen(prev_point.get(), pivot.get(), 2), CagdCrvFree);
+                        Curve b = Curve(CagdMergePtPtLen(pivot.get(), current_point.get(), 2), CagdCrvFree);
+                        Curve pivot_curve = Curve(CagdMergeCrvCrv(a.get(), b.get(), TRUE, 0.5), CagdCrvFree);
+                        surface.reset(CagdRuledSrf(relative_curve, pivot_curve.get(), 2, 2));
+                    }
+                    else
+                    {
+                        if (t0 > t1)
+                        {
+                            std::swap(t0, t1);
+                        }
+                        int proximity;
+                        CagdRType params[2] = {t0, t1};
+                        CagdCrvStruct *sliced_curve =
+                            CagdCrvSubdivAtParams3(CagdCrvCopy(relative_curve), params, 0, 0, FALSE, &proximity);
+                        CagdCrvStruct *wanted_curve = (t0 > 0 && t1 > 0) ? sliced_curve->Pnext : sliced_curve;
+                        prev_point->Pt[0] = wanted_curve->Points[1][0];
+                        prev_point->Pt[1] = wanted_curve->Points[2][0];
+                        current_point->Pt[0] = wanted_curve->Points[1][wanted_curve->Length - 1];
+                        current_point->Pt[1] = wanted_curve->Points[2][wanted_curve->Length - 1];
+                        Curve a = Curve(CagdMergePtPtLen(prev_point.get(), pivot.get(), 2), CagdCrvFree);
+                        Curve b = Curve(CagdMergePtPtLen(pivot.get(), current_point.get(), 2), CagdCrvFree);
+                        Curve pivot_curve = Curve(CagdMergeCrvCrv(a.get(), b.get(), TRUE, 0.5), CagdCrvFree);
+                        surface.reset(CagdRuledSrf(wanted_curve, pivot_curve.get(), 2, 2));
+                        CagdCrvFreeList(sliced_curve);
+                    }
+                }
+                else
+                {
+                    surface.reset(CagdBilinearSrf(prev_point.get(), pivot.get(), current_point.get(), pivot.get(),
+                                                  CAGD_PT_E2_TYPE));
+                }
                 fix_surface_orientation(surface);
                 if (surface != nullptr)
                 {
@@ -1725,7 +1769,7 @@ CagdRType CurvesGenerator::get_offset_curve_subdivision_param(CagdCrvStruct *off
 }
 
 std::vector<IritPoint> CurvesGenerator::get_neighborhood_points(
-    const std::unordered_set<VertexDescriptor> &neighborhood)
+    const std::unordered_set<VertexDescriptor> &neighborhood, std::vector<CagdCrvStruct *> &neighborhood_offset_curves)
 {
     std::unordered_map<VertexDescriptor, std::vector<std::variant<IritPoint, CagdCrvStruct *>>> neighborhood_points;
     m_point_to_originating_curve.clear();
@@ -1743,6 +1787,7 @@ std::vector<IritPoint> CurvesGenerator::get_neighborhood_points(
             {
                 for (const auto &offset_curve : m_curve_to_offset_curves[curve])
                 {
+                    neighborhood_offset_curves.push_back(offset_curve);
                     IritPoint p = IritPoint(CagdPtNew(), CagdPtFree);
                     CAGD_CRV_EVAL_E2(offset_curve, get_offset_curve_subdivision_param(offset_curve, junction),
                                      &p.get()->Pt[0]);
@@ -1909,4 +1954,27 @@ std::vector<IritPoint> CurvesGenerator::get_neighborhood_points(
 #endif // DEBUG_NEIGHBORHOOD_SORT
 
     return neighborhood_points_vector;
+}
+
+std::tuple<CagdCrvStruct *, CagdRType, CagdRType> CurvesGenerator::get_points_matching_curve(
+    const std::vector<CagdCrvStruct *> &curves, const IritPoint &p0, const IritPoint &p1)
+{
+    for (const auto &curve : curves)
+    {
+        IrtPtType Pl = {curve->Points[1][0], curve->Points[2][0], 0};
+        IrtPtType Vl = {curve->Points[1][curve->Length - 1] - curve->Points[1][0],
+                        curve->Points[2][curve->Length - 1] - curve->Points[2][0], 0};
+        IrtPtType p0_point = {p0->Pt[0], p0->Pt[1], 0};
+        IrtPtType p1_point = {p1->Pt[0], p1->Pt[1], 0};
+        IrtPtType closest_point0;
+        IrtPtType closest_point1;
+        CagdRType t0 = GMPointFromPointLine(p0_point, Pl, Vl, closest_point0);
+        CagdRType t1 = GMPointFromPointLine(p1_point, Pl, Vl, closest_point1);
+        if (t0 >= 0 && t0 <= 1 && t1 >= 0 && t1 <= 1 && GMDistPointPoint(p0_point, closest_point0) < 0.001 &&
+            GMDistPointPoint(p1_point, closest_point1) < 0.001)
+        {
+            return std::make_tuple(curve, t0, t1);
+        }
+    }
+    return std::make_tuple(nullptr, 0, 0);
 }

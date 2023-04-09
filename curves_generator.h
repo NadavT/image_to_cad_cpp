@@ -72,7 +72,10 @@ class CurvesGenerator
         const IritPoint &a, const CagdCrvStruct *b,
         const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher);
     CagdRType get_offset_curve_subdivision_param(CagdCrvStruct *offset_curve, VertexDescriptor junction);
-    std::vector<IritPoint> get_neighborhood_points(const std::unordered_set<VertexDescriptor> &neighborhood);
+    std::vector<IritPoint> get_neighborhood_points(const std::unordered_set<VertexDescriptor> &neighborhood,
+                                                   std::vector<CagdCrvStruct *> &neighborhood_offset_curves);
+    std::tuple<CagdCrvStruct *, CagdRType, CagdRType> get_points_matching_curve(
+        const std::vector<CagdCrvStruct *> &curves, const IritPoint &p0, const IritPoint &p1);
 
   private:
     Graph &m_graph;
