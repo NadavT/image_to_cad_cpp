@@ -62,6 +62,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     TIMED_INNER_FUNCTION(sort_junction_curves(), "Sorting junction curves");
     TIMED_INNER_FUNCTION(generate_surfaces_from_junctions(), "Generating surfaces from junctions");
     TIMED_INNER_FUNCTION(find_neighborhoods_intersections(), "Finding neighborhoods intersections");
+    TIMED_INNER_FUNCTION(generate_boundary_points(), "Generating boundary points");
     TIMED_INNER_FUNCTION(fill_holes(), "Filling holes");
     TIMED_INNER_FUNCTION(generate_surfaces_from_curves(), "Generating surfaces from curves");
     TIMED_INNER_FUNCTION(extrude_surfaces(), "Extruding surfaces");
@@ -378,6 +379,9 @@ void CurvesGenerator::generate_offset_curves()
         curves_before_trim_lock.lock();
         m_offset_curves_before_trim.push_back(std::move(offset_curve));
         m_offset_curves_before_trim.push_back(std::move(opposite_offset_curve));
+        m_curve_to_offset_curves_before_trim[curve.get()] = {
+            m_offset_curves_before_trim[m_offset_curves_before_trim.size() - 2].get(),
+            m_offset_curves_before_trim[m_offset_curves_before_trim.size() - 1].get()};
         curves_before_trim_lock.unlock();
         if (new_offset_curve != nullptr && new_opposite_offset_curve != nullptr)
         {
@@ -746,6 +750,99 @@ void CurvesGenerator::generate_surfaces_from_curves()
         }
         CagdCrvFreeList(sliced_offset_curve1);
         CagdCrvFreeList(sliced_offset_curve2);
+    }
+}
+
+void CurvesGenerator::generate_boundary_points()
+{
+    cv::Point boundaries[] = {cv::Point(0, 0), cv::Point(m_reference_image.cols - 1, 0),
+                              cv::Point(0, m_reference_image.rows - 1),
+                              cv::Point(m_reference_image.cols - 1, m_reference_image.rows - 1)};
+    for (const cv::Point &boundary : boundaries)
+    {
+        if (m_reference_image.at<cv::Vec3b>(boundary)[2] < 200)
+        {
+            continue;
+        }
+        VertexDescriptor closest_junction = -1;
+        CagdCrvStruct *closest_curve = nullptr;
+        cv::Point2d closest_point = {-1, -1};
+        for (const auto &item : m_junction_to_curves)
+        {
+            VertexDescriptor junction = item.first;
+            for (const auto &curve : m_junction_to_curves[junction])
+            {
+                for (const auto &offset_curve : m_curve_to_offset_curves_before_trim[curve])
+                {
+                    for (int i = 0; i < 100; ++i)
+                    {
+                        CagdRType t = i / 100.0;
+                        IritPoint point = IritPoint(CagdPtNew(), CagdPtFree);
+                        CAGD_CRV_EVAL_E2(offset_curve, t, &point->Pt[0]);
+                        cv::Point2d cv_point(point->Pt[0], point->Pt[1]);
+                        if (closest_point == cv::Point2d(-1, -1) ||
+                            distance(cv_point, cv::Point2d(boundary)) < distance(closest_point, cv::Point2d(boundary)))
+                        {
+                            closest_point = cv_point;
+                            closest_curve = curve;
+                            VertexDescriptor best = junction;
+                            for (const VertexDescriptor &junction : m_curve_to_junctions[curve])
+                            {
+                                if (distance(cv_point, cv::Point2d(m_graph[junction].p)) <
+                                    distance(cv::Point2d(m_graph[best].p), cv::Point2d(boundary)))
+                                {
+                                    best = junction;
+                                }
+                            }
+                            closest_junction = best;
+                        }
+                    }
+                }
+            }
+        }
+        if (m_curve_to_offset_curves.count(closest_curve) == 0 || m_curve_to_offset_curves[closest_curve].size() != 2)
+        {
+            if (m_boundary_points.count(closest_junction) == 0)
+            {
+                m_boundary_points[closest_junction] = std::vector<std::tuple<cv::Point, CagdCrvStruct *>>();
+            }
+            m_boundary_points[closest_junction].push_back(std::make_tuple(boundary, closest_curve));
+        }
+        else
+        {
+            cv::Point2d closest_point_after_trim = {-1, -1};
+            for (const auto &offset_curve : m_curve_to_offset_curves[closest_curve])
+            {
+                for (int i = 0; i < 100; ++i)
+                {
+                    CagdRType t = i / 100.0;
+                    IritPoint point = IritPoint(CagdPtNew(), CagdPtFree);
+                    CAGD_CRV_EVAL_E2(offset_curve, t, &point->Pt[0]);
+                    cv::Point2d cv_point(point->Pt[0], point->Pt[1]);
+                    if (closest_point_after_trim == cv::Point2d(-1, -1) ||
+                        distance(cv_point, cv::Point2d(boundary)) < distance(closest_point, cv::Point2d(boundary)))
+                    {
+                        closest_point_after_trim = cv_point;
+                    }
+                }
+            }
+            if (distance(closest_point, closest_point_after_trim) > 10)
+            {
+                if (m_boundary_points.count(closest_junction) == 0)
+                {
+                    m_boundary_points[closest_junction] = std::vector<std::tuple<cv::Point, CagdCrvStruct *>>();
+                }
+                m_boundary_points[closest_junction].push_back(std::make_tuple(boundary, closest_curve));
+            }
+        }
+    }
+    for (const auto &item : m_boundary_points)
+    {
+        std::cout << "\t\tBoundary points for junction " << m_graph[item.first].p << " are:" << std::endl;
+        for (const auto &item : item.second)
+        {
+            std::cout << "\t\t\t" << std::get<0>(item) << std::endl;
+        }
     }
 }
 
@@ -1777,6 +1874,20 @@ std::vector<IritPoint> CurvesGenerator::get_neighborhood_points(
     {
         std::vector<std::variant<IritPoint, CagdCrvStruct *>> junction_reference;
         std::unordered_map<cv::Point, CagdPtStruct *> unique_points;
+        if (m_boundary_points.count(junction) > 0)
+        {
+            for (const auto &item : m_boundary_points[junction])
+            {
+                const cv::Point &point = std::get<0>(item);
+                IritPoint p = IritPoint(CagdPtNew(), CagdPtFree);
+                CagdCrvStruct *curve = std::get<1>(item);
+                p->Pt[0] = point.x;
+                p->Pt[1] = point.y;
+                unique_points[point] = p.get();
+                m_point_to_originating_curve[p.get()] = {std::make_tuple(curve, nullptr, 0)};
+                junction_reference.push_back(std::move(p));
+            }
+        }
         for (const auto &curve : m_junction_to_curves[junction])
         {
             if (m_curve_to_offset_curves.count(curve) == 0 || m_curve_to_offset_curves[curve].empty())

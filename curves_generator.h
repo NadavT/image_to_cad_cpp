@@ -37,8 +37,9 @@ class CurvesGenerator
     void sort_junction_curves();
     void generate_surfaces_from_junctions();
     void find_neighborhoods_intersections();
-    void generate_surfaces_from_curves();
+    void generate_boundary_points();
     void fill_holes();
+    void generate_surfaces_from_curves();
     void extrude_surfaces();
 
     std::vector<std::pair<std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>>> split_junction_walk(
@@ -88,6 +89,7 @@ class CurvesGenerator
     bool m_filter_offset_curves;
     std::vector<OffsetCurveDetails> m_filtered_offset_curves;
     OffsetCurveMatcher m_curve_to_offset_curves;
+    OffsetCurveMatcher m_curve_to_offset_curves_before_trim;
     std::unordered_map<VertexDescriptor, std::vector<CagdCrvStruct *>> m_junction_to_curves;
     std::unordered_map<CagdCrvStruct *, std::vector<VertexDescriptor>> m_curve_to_junctions;
     std::set<std::pair<VertexDescriptor, VertexDescriptor>> m_connections;
@@ -110,6 +112,7 @@ class CurvesGenerator
     double m_junction_radius_adder;
     std::unordered_map<cv::Point, double> m_junctions_radius;
     std::mutex m_junction_radius_lock;
+    std::unordered_map<VertexDescriptor, std::vector<std::tuple<cv::Point, CagdCrvStruct *>>> m_boundary_points;
 };
 
 #endif /* CURVES_GENERATOR_H */
