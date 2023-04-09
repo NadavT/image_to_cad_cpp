@@ -809,17 +809,38 @@ void CurvesGenerator::fill_holes()
         last_vertex->Pnext = first_vertex;
         IPPolygonStruct *polygon = IPAllocPolygon(0, first_vertex, nullptr);
         IPUpdatePolyPlane(polygon);
-        IPObjectStruct *object = IPGenPOLYObject(polygon);
-        IPPutObjectToFile3(
-            ("polygons/" + std::to_string(points[0]->Pt[0]) + "," + std::to_string(points[0]->Pt[1]) + ".itd").c_str(),
-            object, 0);
         IPPolygonStruct *polygons = GMSplitNonConvexPoly(polygon, FALSE);
         IPFreePolygon(polygon);
-        object = IPGenPOLYObject(polygons);
-        IPPutObjectToFile3(
-            ("splitted_polygons/" + std::to_string(points[0]->Pt[0]) + "," + std::to_string(points[0]->Pt[1]) + ".itd")
-                .c_str(),
-            object, 0);
+        for (IPPolygonStruct *current_polygon = polygons; current_polygon != nullptr;
+             current_polygon = current_polygon->Pnext)
+        {
+            IritPoint pivot = IritPoint(CagdPtNew(), CagdPtFree);
+            GMComputeAverageVertex(current_polygon->PVertex, pivot->Pt, 1);
+            IPVertexStruct *first_vertex = current_polygon->PVertex;
+            IPVertexStruct *prev_vertex = first_vertex;
+            IPVertexStruct *current_vertex = first_vertex->Pnext;
+            do
+            {
+                IritPoint prev_point = IritPoint(CagdPtNew(), CagdPtFree);
+                prev_point.get()->Pt[0] = prev_vertex->Coord[0];
+                prev_point.get()->Pt[1] = prev_vertex->Coord[1];
+                prev_point.get()->Pt[2] = 0;
+                IritPoint current_point = IritPoint(CagdPtNew(), CagdPtFree);
+                current_point.get()->Pt[0] = current_vertex->Coord[0];
+                current_point.get()->Pt[1] = current_vertex->Coord[1];
+                current_point.get()->Pt[2] = 0;
+                IritSurface surface = IritSurface(
+                    CagdBilinearSrf(prev_point.get(), pivot.get(), current_point.get(), pivot.get(), CAGD_PT_E2_TYPE),
+                    CagdSrfFree);
+                fix_surface_orientation(surface);
+                if (surface != nullptr)
+                {
+                    m_surfaces.push_back(std::move(surface));
+                }
+                prev_vertex = current_vertex;
+                current_vertex = current_vertex->Pnext;
+            } while (prev_vertex != first_vertex);
+        }
         IPFreePolygonList(polygons);
     }
 }
