@@ -2005,7 +2005,11 @@ std::vector<IritPoint> CurvesGenerator::get_neighborhood_points(
     {
         if (std::holds_alternative<IritPoint>(*current_iter))
         {
-            if (&(*current_iter) != last_point)
+            cv::Point2d p0 =
+                cv::Point2d(std::get<IritPoint>(*last_point)->Pt[0], std::get<IritPoint>(*last_point)->Pt[1]);
+            cv::Point2d p1 =
+                cv::Point2d(std::get<IritPoint>(*current_iter)->Pt[0], std::get<IritPoint>(*current_iter)->Pt[1]);
+            if (distance(p0, p1) > 0.001)
             {
 #ifdef DEBUG_NEIGHBORHOOD_SORT
                 std::cout << "\t\t\tPoint: " << std::get<IritPoint>(*current_iter).get()->Pt[0] << ", "
