@@ -52,11 +52,14 @@ int main(int argc, char **argv)
         .help("Crop to fit padding bottom")
         .default_value(0)
         .scan<'i', int>();
-    program.add_argument("-it", "--islands_threshold").help("Islands threshold").default_value(4.0).scan<'g', double>();
+    program.add_argument("-it", "--islands_threshold")
+        .help("Islands threshold")
+        .default_value(25.0)
+        .scan<'g', double>();
     program.add_argument("-s", "--scale").help("Scale factor").default_value(4.0).scan<'g', double>();
     program.add_argument("-r", "--reduction_proximity")
         .help("Reduction proximity")
-        .default_value(0.0)
+        .default_value(10.0)
         .scan<'g', double>();
     program.add_argument("-lt", "--hanging_leaf_threshold")
         .help("Hanging leaf threshold")
@@ -73,13 +76,13 @@ int main(int argc, char **argv)
     program.add_argument("-b", "--border").help("Should add border").default_value(false).implicit_value(true);
     program.add_argument("-co", "--curve_order")
         .help("Assign the maximal order of the curve (B-Spline), use -1 to unlimited (Bezier curve)")
-        .default_value(4)
+        .default_value(100)
         .scan<'i', int>();
     program.add_argument("-tco", "--target_curve_order")
         .help("Assign the target order of the curve (B-Spline), use -1 to unlimited (Bezier curve)")
         .default_value(4)
         .scan<'i', int>();
-    program.add_argument("-ex", "--extrusion").help("Extrusion amount").default_value(10.0).scan<'g', double>();
+    program.add_argument("-ex", "--extrusion").help("Extrusion amount").default_value(25.0).scan<'g', double>();
     program.add_argument("-foc", "--filter_offset_curves")
         .help("Should filter offset curves")
         .default_value(false)
@@ -110,7 +113,7 @@ int main(int argc, char **argv)
         .scan<'i', int>();
     program.add_argument("-jra", "--junction_radius_adder")
         .help("The radius of the junctions will be increased by this value (for treaming the outgoing curves")
-        .default_value(2.0)
+        .default_value(6.0)
         .scan<'g', double>();
 
     try
