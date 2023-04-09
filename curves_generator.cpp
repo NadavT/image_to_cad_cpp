@@ -592,7 +592,7 @@ void CurvesGenerator::generate_surfaces_from_junctions()
                     surface = IritSurface(
                         CagdBilinearSrf(points[i].get(), pivot.get(), points[j].get(), pivot.get(), CAGD_PT_E2_TYPE),
                         CagdSrfFree);
-                    fix_surface_orientation(surface, false);
+                    fix_surface_orientation(surface);
                     if (surface != nullptr)
                     {
                         m_surfaces.push_back(std::move(surface));
