@@ -8,7 +8,8 @@ class ProcessGraph
   public:
     ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordered_set<Segment> &added_edges,
                  double reduction_proximity, double hanging_threshold, double junction_collapse_threshold,
-                 double junction_smooth_threshold, int width, int height, bool add_border);
+                 double junction_smooth_threshold, int width, int height, bool add_border, Image &image,
+                 double scale_factor);
 
     static std::tuple<double, std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> walk_to_next_junction(
         VertexDescriptor source, VertexDescriptor direction, const Graph &graph, bool get_cycle = false);
@@ -16,7 +17,7 @@ class ProcessGraph
     Graph &get_graph();
 
   private:
-    void remove_border(int width, int height);
+    void remove_border(int width, int height, Image &image);
     void reduce(double reduction_proximity);
     void remove_hanging(int width, int height);
     void collapse_junctions(double junction_collapse_threshold);
@@ -37,6 +38,7 @@ class ProcessGraph
     double m_hanging_threshold;
     double m_junction_collapse_threshold;
     double m_junction_smooth_threshold;
+    double m_scale_factor;
 };
 
 #endif /* PROCESS_GRAPH_H */

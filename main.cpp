@@ -149,7 +149,8 @@ int main(int argc, char **argv)
                        program.get<double>("--hanging_leaf_threshold"),
                        program.get<double>("--junction_collapse_threshold"),
                        program.get<double>("--junction_smooth_threshold"), preprocess_image.get_colored_image().cols,
-                       preprocess_image.get_colored_image().rows, program.get<bool>("--border")),
+                       preprocess_image.get_colored_image().rows, program.get<bool>("--border"),
+                       preprocess_image.get_colored_image(), program.get<double>("--scale")),
                    "Processing graph");
     TIMED_FUNCTION(
         CurvesGenerator curves_generator(

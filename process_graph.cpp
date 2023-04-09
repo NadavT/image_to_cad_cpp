@@ -5,7 +5,8 @@
 
 ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordered_set<Segment> &added_edges,
                            double reduction_proximity, double hanging_threshold, double junction_collapse_threshold,
-                           double junction_smooth_threshold, int width, int height, bool add_border)
+                           double junction_smooth_threshold, int width, int height, bool add_border, Image &image,
+                           double scale_factor)
     : m_graph(graph)
     , m_vertex_descriptor_map(map)
     , m_added_edges(added_edges)
@@ -13,10 +14,11 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
     , m_hanging_threshold(hanging_threshold)
     , m_junction_collapse_threshold(junction_collapse_threshold)
     , m_junction_smooth_threshold(junction_smooth_threshold)
+    , m_scale_factor(scale_factor)
 {
     if (add_border)
     {
-        TIMED_INNER_FUNCTION(remove_border(width, height), "Removing border from graph");
+        TIMED_INNER_FUNCTION(remove_border(width, height, image), "Removing border from graph");
     }
 
     TIMED_INNER_FUNCTION(reduce(m_reduction_proximity), "Reducing graph");
@@ -51,18 +53,23 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
     cv::imwrite("final_graph_processing.png", image_graph);
 }
 
-void ProcessGraph::remove_border(int width, int height)
+void ProcessGraph::remove_border(int width, int height, Image &image)
 {
     // Iterate over all vertices
     auto vertices = boost::vertices(m_graph);
     for (auto it = vertices.first; it != vertices.second; ++it)
     {
         Vertex &vertex = m_graph[*it];
-        if (vertex.p.x <= 8 || vertex.p.y <= 8 || vertex.p.x >= width - 9 || vertex.p.y >= height - 9)
+        if (vertex.p.x <= 2 * m_scale_factor || vertex.p.y <= 2 * m_scale_factor ||
+            vertex.p.x >= width - 2 * m_scale_factor - 1 || vertex.p.y >= height - 2 * m_scale_factor - 1)
         {
             boost::clear_vertex(*it, m_graph);
         }
     }
+    cv::Rect roi = cv::Rect(2 * m_scale_factor, 2 * m_scale_factor, image.cols - 4 * m_scale_factor,
+                            image.rows - 4 * m_scale_factor);
+    image = image(roi);
+    cv::imwrite("after_border_removal.png", image);
 }
 
 void ProcessGraph::reduce(double reduction_proximity)
