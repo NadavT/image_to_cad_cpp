@@ -958,7 +958,11 @@ void CurvesGenerator::fill_holes()
                 IritSurface surface = IritSurface(nullptr, CagdSrfFree);
                 if (relative_curve != nullptr)
                 {
-                    if ((t0 < 0.01 || 1 - t0 < 0.01) && (t1 < 0.01 || 1 - t1 < 0.01))
+                    if (t0 > t1)
+                    {
+                        std::swap(t0, t1);
+                    }
+                    if (t0 < 0.01 && t1 > 0.99)
                     {
                         prev_point->Pt[0] = relative_curve->Points[1][0];
                         prev_point->Pt[1] = relative_curve->Points[2][0];
@@ -971,24 +975,39 @@ void CurvesGenerator::fill_holes()
                     }
                     else
                     {
-                        if (t0 > t1)
-                        {
-                            std::swap(t0, t1);
-                        }
-                        int proximity;
-                        CagdRType params[2] = {t0, t1};
-                        CagdCrvStruct *sliced_curve =
-                            CagdCrvSubdivAtParams3(CagdCrvCopy(relative_curve), params, 0, 0, FALSE, &proximity);
-                        CagdCrvStruct *wanted_curve = (t0 > 0 && t1 > 0) ? sliced_curve->Pnext : sliced_curve;
-                        prev_point->Pt[0] = wanted_curve->Points[1][0];
-                        prev_point->Pt[1] = wanted_curve->Points[2][0];
-                        current_point->Pt[0] = wanted_curve->Points[1][wanted_curve->Length - 1];
-                        current_point->Pt[1] = wanted_curve->Points[2][wanted_curve->Length - 1];
-                        Curve a = Curve(CagdMergePtPtLen(prev_point.get(), pivot.get(), 2), CagdCrvFree);
-                        Curve b = Curve(CagdMergePtPtLen(pivot.get(), current_point.get(), 2), CagdCrvFree);
-                        Curve pivot_curve = Curve(CagdMergeCrvCrv(a.get(), b.get(), TRUE, 0.5), CagdCrvFree);
-                        surface.reset(CagdRuledSrf(wanted_curve, pivot_curve.get(), 2, 2));
-                        CagdCrvFreeList(sliced_curve);
+                        surface.reset(CagdBilinearSrf(prev_point.get(), pivot.get(), current_point.get(), pivot.get(),
+                                                      CAGD_PT_E2_TYPE));
+                        // Approximation isn't good enough and middle points are problematic to other polygons
+                        // int proximity;
+                        // CagdCrvStruct *sliced_curve = nullptr;
+                        // CagdCrvStruct *wanted_curve = nullptr;
+                        // if (t0 < 0.01)
+                        // {
+                        //     CagdRType params[2] = {0, t1};
+                        //     sliced_curve = CagdCrvSubdivAtParams3(relative_curve, params, 2, 0, FALSE, &proximity);
+                        //     wanted_curve = sliced_curve;
+                        // }
+                        // else if (t1 > 0.99)
+                        // {
+                        //     CagdRType params[2] = {t0, 1};
+                        //     sliced_curve = CagdCrvSubdivAtParams3(relative_curve, params, 2, 0, FALSE, &proximity);
+                        //     wanted_curve = sliced_curve->Pnext;
+                        // }
+                        // else
+                        // {
+                        //     CagdRType params[2] = {t0, t1};
+                        //     sliced_curve = CagdCrvSubdivAtParams3(relative_curve, params, 2, 0, FALSE, &proximity);
+                        //     wanted_curve = sliced_curve->Pnext;
+                        // }
+                        // prev_point->Pt[0] = wanted_curve->Points[1][0];
+                        // prev_point->Pt[1] = wanted_curve->Points[2][0];
+                        // current_point->Pt[0] = wanted_curve->Points[1][wanted_curve->Length - 1];
+                        // current_point->Pt[1] = wanted_curve->Points[2][wanted_curve->Length - 1];
+                        // Curve a = Curve(CagdMergePtPtLen(prev_point.get(), pivot.get(), 2), CagdCrvFree);
+                        // Curve b = Curve(CagdMergePtPtLen(pivot.get(), current_point.get(), 2), CagdCrvFree);
+                        // Curve pivot_curve = Curve(CagdMergeCrvCrv(a.get(), b.get(), TRUE, 0.5), CagdCrvFree);
+                        // surface.reset(CagdRuledSrf(wanted_curve, pivot_curve.get(), 2, 2));
+                        // CagdCrvFreeList(sliced_curve);
                     }
                 }
                 else
