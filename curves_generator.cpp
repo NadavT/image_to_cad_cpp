@@ -60,9 +60,9 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     TIMED_INNER_FUNCTION(decrease_curves_order(), "Decrease curves order");
     TIMED_INNER_FUNCTION(generate_offset_curves(), "Generating offset curves");
     TIMED_INNER_FUNCTION(sort_junction_curves(), "Sorting junction curves");
+    TIMED_INNER_FUNCTION(generate_boundary_points(), "Generating boundary points");
     TIMED_INNER_FUNCTION(generate_surfaces_from_junctions(), "Generating surfaces from junctions");
     TIMED_INNER_FUNCTION(find_neighborhoods_intersections(), "Finding neighborhoods intersections");
-    TIMED_INNER_FUNCTION(generate_boundary_points(), "Generating boundary points");
     TIMED_INNER_FUNCTION(fill_holes(), "Filling holes");
     TIMED_INNER_FUNCTION(generate_surfaces_from_curves(), "Generating surfaces from curves");
     TIMED_INNER_FUNCTION(extrude_surfaces(), "Extruding surfaces");
@@ -552,6 +552,19 @@ void CurvesGenerator::generate_surfaces_from_junctions()
         }
         m_point_to_originating_curve.clear();
         std::vector<IritPoint> points = get_intersection_points(junction_matcher);
+        if (m_boundary_points.count(junction_matcher.first) > 0)
+        {
+            for (const auto &item : m_boundary_points[junction_matcher.first])
+            {
+                const cv::Point &point = std::get<0>(item);
+                IritPoint p = IritPoint(CagdPtNew(), CagdPtFree);
+                CagdCrvStruct *curve = std::get<1>(item);
+                p->Pt[0] = point.x;
+                p->Pt[1] = point.y;
+                m_point_to_originating_curve[p.get()] = {std::make_tuple(curve, nullptr, 0)};
+                points.push_back(std::move(p));
+            }
+        }
         if (points.size() == 3)
         {
             IritSurface surface = IritSurface(
@@ -765,6 +778,7 @@ void CurvesGenerator::generate_boundary_points()
             continue;
         }
         VertexDescriptor closest_junction = -1;
+        CagdRType closest_t = -1;
         CagdCrvStruct *closest_curve = nullptr;
         cv::Point2d closest_point = {-1, -1};
         for (const auto &item : m_junction_to_curves)
@@ -774,7 +788,7 @@ void CurvesGenerator::generate_boundary_points()
             {
                 for (const auto &offset_curve : m_curve_to_offset_curves_before_trim[curve])
                 {
-                    for (int i = 0; i < 100; ++i)
+                    for (int i = 0; i <= 100; ++i)
                     {
                         CagdRType t = i / 100.0;
                         IritPoint point = IritPoint(CagdPtNew(), CagdPtFree);
@@ -795,6 +809,7 @@ void CurvesGenerator::generate_boundary_points()
                                 }
                             }
                             closest_junction = best;
+                            closest_t = t;
                         }
                     }
                 }
@@ -806,6 +821,10 @@ void CurvesGenerator::generate_boundary_points()
             {
                 m_boundary_points[closest_junction] = std::vector<std::tuple<cv::Point, CagdCrvStruct *>>();
             }
+            if (closest_t == 0 || closest_t >= 0.99)
+            {
+                closest_curve = nullptr;
+            }
             m_boundary_points[closest_junction].push_back(std::make_tuple(boundary, closest_curve));
         }
         else
@@ -813,7 +832,7 @@ void CurvesGenerator::generate_boundary_points()
             cv::Point2d closest_point_after_trim = {-1, -1};
             for (const auto &offset_curve : m_curve_to_offset_curves[closest_curve])
             {
-                for (int i = 0; i < 100; ++i)
+                for (int i = 0; i <= 100; ++i)
                 {
                     CagdRType t = i / 100.0;
                     IritPoint point = IritPoint(CagdPtNew(), CagdPtFree);
@@ -831,6 +850,10 @@ void CurvesGenerator::generate_boundary_points()
                 if (m_boundary_points.count(closest_junction) == 0)
                 {
                     m_boundary_points[closest_junction] = std::vector<std::tuple<cv::Point, CagdCrvStruct *>>();
+                }
+                if (closest_t == 0 || closest_t >= 0.99)
+                {
+                    closest_curve = nullptr;
                 }
                 m_boundary_points[closest_junction].push_back(std::make_tuple(boundary, closest_curve));
             }
@@ -1623,7 +1646,9 @@ IritSurface CurvesGenerator::generate_surface_from_pivot_and_points(const IritPo
     if (m_point_to_originating_curve.count(p0.get()) == 0 || m_point_to_originating_curve.count(p1.get()) == 0 ||
         m_point_to_originating_curve[p0.get()].size() > 1 || m_point_to_originating_curve[p1.get()].size() > 1 ||
         std::get<0>(m_point_to_originating_curve[p0.get()][0]) ==
-            std::get<0>(m_point_to_originating_curve[p1.get()][0]))
+            std::get<0>(m_point_to_originating_curve[p1.get()][0]) ||
+        std::get<1>(m_point_to_originating_curve[p0.get()][0]) == nullptr ||
+        std::get<1>(m_point_to_originating_curve[p1.get()][0]) == nullptr)
     {
         return IritSurface(CagdBilinearSrf(p0.get(), pivot.get(), p1.get(), pivot.get(), CAGD_PT_E2_TYPE), CagdSrfFree);
     }
@@ -1734,49 +1759,37 @@ bool CurvesGenerator::compare_two_points_in_junction(
     auto prev_iter = junction_matcher.second.end();
     for (const auto &item : m_point_to_originating_curve[a.get()])
     {
-        auto current_iter =
-            std::find(junction_matcher.second.begin(), junction_matcher.second.end(), std::get<0>(item));
-        if (std::distance(current_iter, prev_iter) > 0)
+        if (std::get<0>(item) != nullptr)
         {
-            a_curve = std::get<0>(item);
-            prev_iter = current_iter;
+            auto current_iter =
+                std::find(junction_matcher.second.begin(), junction_matcher.second.end(), std::get<0>(item));
+            if (std::distance(current_iter, prev_iter) > 0)
+            {
+                a_curve = std::get<0>(item);
+                prev_iter = current_iter;
+            }
         }
-    }
-    if (a_curve == nullptr)
-    {
-        std::cerr << "Could not find curve for point " << a << std::endl;
-        throw std::runtime_error("Could not find curve for point");
     }
     CagdCrvStruct *b_curve = nullptr;
     prev_iter = junction_matcher.second.end();
     for (const auto &item : m_point_to_originating_curve[b.get()])
     {
-        auto current_iter =
-            std::find(junction_matcher.second.begin(), junction_matcher.second.end(), std::get<0>(item));
-        if (std::distance(current_iter, prev_iter) > 0)
+        if (std::get<0>(item) != nullptr)
         {
-            b_curve = std::get<0>(item);
-            prev_iter = current_iter;
+            auto current_iter =
+                std::find(junction_matcher.second.begin(), junction_matcher.second.end(), std::get<0>(item));
+            if (std::distance(current_iter, prev_iter) > 0)
+            {
+                b_curve = std::get<0>(item);
+                prev_iter = current_iter;
+            }
         }
-    }
-    if (b_curve == nullptr)
-    {
-        std::cerr << "Could not find curve for point " << b << std::endl;
-        throw std::runtime_error("Could not find curve for point");
     }
 
-    if (a_curve == b_curve)
+    double a_cartesian = std::atan2(a->Pt[1] - junction_point.y, a->Pt[0] - junction_point.x);
+    double b_cartesian = std::atan2(b->Pt[1] - junction_point.y, b->Pt[0] - junction_point.x);
+    if (a_curve == nullptr || b_curve == nullptr || a_curve == b_curve)
     {
-        double a_cartesian = std::atan2(a->Pt[1] - junction_point.y, a->Pt[0] - junction_point.x);
-        double b_cartesian = std::atan2(b->Pt[1] - junction_point.y, b->Pt[0] - junction_point.x);
-        if (a_cartesian > M_PI / 2 && b_cartesian < -M_PI / 2)
-        {
-            return true;
-        }
-        if (a_cartesian < -M_PI / 2 && b_cartesian > M_PI / 2)
-        {
-            return false;
-        }
         return a_cartesian < b_cartesian;
     }
 
@@ -1786,6 +1799,22 @@ bool CurvesGenerator::compare_two_points_in_junction(
     {
         std::cerr << "ERROR: Failed to find curve order" << std::endl;
         throw std::runtime_error("Failed to find curve order");
+    }
+    if (a_iter == junction_matcher.second.begin() && a_cartesian > M_PI / 2)
+    {
+        return false;
+    }
+    if (*a_iter == junction_matcher.second.back() && a_cartesian < -M_PI / 2)
+    {
+        return true;
+    }
+    if (b_iter == junction_matcher.second.begin() && b_cartesian > M_PI / 2)
+    {
+        return true;
+    }
+    if (*b_iter == junction_matcher.second.back() && a_cartesian < -M_PI / 2)
+    {
+        return false;
     }
     return std::distance(a_iter, b_iter) > 0;
 }
@@ -1808,24 +1837,21 @@ bool CurvesGenerator::compare_point_and_curve_in_junction(
     auto prev_iter = junction_matcher.second.end();
     for (const auto &item : m_point_to_originating_curve[a.get()])
     {
-        auto current_iter =
-            std::find(junction_matcher.second.begin(), junction_matcher.second.end(), std::get<0>(item));
-        if (std::distance(current_iter, prev_iter) > 0)
+        if (std::get<0>(item) != nullptr)
         {
-            a_curve = std::get<0>(item);
-            prev_iter = current_iter;
+            auto current_iter =
+                std::find(junction_matcher.second.begin(), junction_matcher.second.end(), std::get<0>(item));
+            if (std::distance(current_iter, prev_iter) > 0)
+            {
+                a_curve = std::get<0>(item);
+                prev_iter = current_iter;
+            }
         }
     }
-    if (a_curve == nullptr)
+    cv::Point2d junction_point = m_graph[junction_matcher.first].p;
+    double a_cartesian = std::atan2(a->Pt[1] - junction_point.y, a->Pt[0] - junction_point.x);
+    if (a_curve == nullptr || a_curve == b)
     {
-        std::cerr << "Could not find curve for point " << a << std::endl;
-        throw std::runtime_error("Could not find curve for point");
-    }
-    if (a_curve == b)
-    {
-        cv::Point2d junction_point = m_graph[junction_matcher.first].p;
-        double a_cartesian = std::atan2(a->Pt[1] - junction_point.y, a->Pt[0] - junction_point.x);
-
         cv::Point2d b_point = cv::Point2d(b->Points[1][1], b->Points[2][1]);
         if (distance(b_point, junction_point) >
             distance(cv::Point2d(b->Points[1][b->Length - 2], b->Points[2][b->Length - 2]), junction_point))
@@ -1833,18 +1859,18 @@ bool CurvesGenerator::compare_point_and_curve_in_junction(
             b_point = cv::Point2d(b->Points[1][b->Length - 2], b->Points[2][b->Length - 2]);
         }
         double b_cartesian = std::atan2(b_point.y - junction_point.y, b_point.x - junction_point.x);
-        if (a_cartesian > M_PI / 2 && b_cartesian < -M_PI / 2)
-        {
-            return true;
-        }
-        if (a_cartesian < -M_PI / 2 && b_cartesian > M_PI / 2)
-        {
-            return false;
-        }
         return a_cartesian < b_cartesian;
     }
     auto a_iter = std::find(junction_matcher.second.begin(), junction_matcher.second.end(), a_curve);
     auto b_iter = std::find(junction_matcher.second.begin(), junction_matcher.second.end(), b);
+    if (a_iter == junction_matcher.second.begin() && a_cartesian > M_PI / 2)
+    {
+        return false;
+    }
+    if (*a_iter == junction_matcher.second.back() && a_cartesian < -M_PI / 2)
+    {
+        return true;
+    }
     return std::distance(a_iter, b_iter) > 0;
 }
 
