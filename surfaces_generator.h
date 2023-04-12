@@ -1,5 +1,5 @@
-#ifndef CURVES_GENERATOR_H
-#define CURVES_GENERATOR_H
+#ifndef SURFACES_GENERATOR_H
+#define SURFACES_GENERATOR_H
 
 #include "types.h"
 
@@ -12,13 +12,14 @@ using ImageVertexDescriptor = ImageGraph::vertex_descriptor;
 using ImageEdgeDescriptor = ImageGraph::edge_descriptor;
 using ImageVertexDescriptorMap = std::unordered_map<cv::Point, ImageVertexDescriptor>;
 
-class CurvesGenerator
+class SurfacesGenerator
 {
   public:
-    CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount, bool filter_curves,
-                    const Image &reference_image, int distance_to_boundary_samples, int distance_to_boundary_threshold,
-                    double distance_in_boundary_backoff, double distance_in_boundary_factor, double curve_density,
-                    int min_curve_length, double junction_radius_adder);
+    SurfacesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount, bool filter_curves,
+                      const Image &reference_image, int distance_to_boundary_samples,
+                      int distance_to_boundary_threshold, double distance_in_boundary_backoff,
+                      double distance_in_boundary_factor, double curve_density, int min_curve_length,
+                      double junction_radius_adder);
 
     std::vector<Curve> get_curves();
 
@@ -115,4 +116,4 @@ class CurvesGenerator
     std::unordered_map<VertexDescriptor, std::vector<std::tuple<cv::Point, CagdCrvStruct *>>> m_boundary_points;
 };
 
-#endif /* CURVES_GENERATOR_H */
+#endif /* SURFACES_GENERATOR_H */

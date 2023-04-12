@@ -1,4 +1,4 @@
-#include "curves_generator.h"
+#include "surfaces_generator.h"
 
 #include "math.h"
 #include "process_graph.h"
@@ -21,11 +21,11 @@ static inline unsigned int point_to_index(const cv::Point &point, const int widt
     return point.y * width + point.x;
 }
 
-CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
-                                 bool filter_curves, const Image &reference_image, int distance_to_boundary_samples,
-                                 int distance_to_boundary_threshold, double distance_in_boundary_backoff,
-                                 double distance_in_boundary_factor, double curve_density, int min_curve_length,
-                                 double junction_radius_adder)
+SurfacesGenerator::SurfacesGenerator(Graph &graph, int max_order, int target_order, double extrusion_amount,
+                                     bool filter_curves, const Image &reference_image, int distance_to_boundary_samples,
+                                     int distance_to_boundary_threshold, double distance_in_boundary_backoff,
+                                     double distance_in_boundary_factor, double curve_density, int min_curve_length,
+                                     double junction_radius_adder)
     : m_graph(graph)
     , m_curves()
     , m_max_order(max_order)
@@ -68,7 +68,7 @@ CurvesGenerator::CurvesGenerator(Graph &graph, int max_order, int target_order, 
     TIMED_INNER_FUNCTION(extrude_surfaces(), "Extruding surfaces");
 }
 
-void CurvesGenerator::write_curves(const std::string &filename)
+void SurfacesGenerator::write_curves(const std::string &filename)
 {
     int handler = IPOpenDataFile(filename.c_str(), FALSE, TRUE);
     for (auto &curve : m_height_curves)
@@ -79,7 +79,7 @@ void CurvesGenerator::write_curves(const std::string &filename)
     IPCloseStream(handler, TRUE);
 }
 
-void CurvesGenerator::write_offset_curves_before_trim(const std::string &filename)
+void SurfacesGenerator::write_offset_curves_before_trim(const std::string &filename)
 {
     int handler = IPOpenDataFile(filename.c_str(), FALSE, TRUE);
     for (auto &curve : m_offset_curves_before_trim)
@@ -90,7 +90,7 @@ void CurvesGenerator::write_offset_curves_before_trim(const std::string &filenam
     IPCloseStream(handler, TRUE);
 }
 
-void CurvesGenerator::write_offset_curves(const std::string &filename)
+void SurfacesGenerator::write_offset_curves(const std::string &filename)
 {
     int handler = IPOpenDataFile(filename.c_str(), FALSE, TRUE);
     for (auto &curve : m_offset_curves)
@@ -101,7 +101,7 @@ void CurvesGenerator::write_offset_curves(const std::string &filename)
     IPCloseStream(handler, TRUE);
 }
 
-void CurvesGenerator::write_filtered_offset_curves(const std::string &filename)
+void SurfacesGenerator::write_filtered_offset_curves(const std::string &filename)
 {
     int handler = IPOpenDataFile(filename.c_str(), FALSE, TRUE);
     for (auto &curve : m_filtered_offset_curves)
@@ -112,7 +112,7 @@ void CurvesGenerator::write_filtered_offset_curves(const std::string &filename)
     IPCloseStream(handler, TRUE);
 }
 
-void CurvesGenerator::write_surfaces(const std::string &filename)
+void SurfacesGenerator::write_surfaces(const std::string &filename)
 {
     int handler = IPOpenDataFile(filename.c_str(), FALSE, TRUE);
     for (auto &surface : m_surfaces)
@@ -122,7 +122,7 @@ void CurvesGenerator::write_surfaces(const std::string &filename)
     }
     IPCloseStream(handler, TRUE);
 }
-void CurvesGenerator::write_extrusions(const std::string &filename)
+void SurfacesGenerator::write_extrusions(const std::string &filename)
 {
     int handler = IPOpenDataFile(filename.c_str(), FALSE, TRUE);
     for (auto &extrusion : m_extrusions)
@@ -133,7 +133,7 @@ void CurvesGenerator::write_extrusions(const std::string &filename)
     IPCloseStream(handler, TRUE);
 }
 
-void CurvesGenerator::generate_image_graph()
+void SurfacesGenerator::generate_image_graph()
 {
     std::cout << "\t\tFinished " << 0 << " colums out of " << m_reference_image.cols << std::endl;
     m_image_graph.m_vertices.reserve(m_reference_image.cols * m_reference_image.rows);
@@ -177,7 +177,7 @@ void CurvesGenerator::generate_image_graph()
               << boost::num_edges(m_image_graph) << " edges" << std::endl;
 }
 
-void CurvesGenerator::generate_curves()
+void SurfacesGenerator::generate_curves()
 {
     // Get candidates
     std::vector<std::tuple<EdgeDescriptor, VertexDescriptor>> candidates;
@@ -236,7 +236,7 @@ void CurvesGenerator::generate_curves()
     }
 }
 
-void CurvesGenerator::decrease_curves_order()
+void SurfacesGenerator::decrease_curves_order()
 {
     if (m_target_order == m_max_order)
     {
@@ -327,7 +327,7 @@ void CurvesGenerator::decrease_curves_order()
     m_height_curves = std::move(new_height_curves);
 }
 
-void CurvesGenerator::generate_offset_curves()
+void SurfacesGenerator::generate_offset_curves()
 {
     int i = 0;
     std::mutex junctions_to_curves_lock;
@@ -512,7 +512,7 @@ void CurvesGenerator::generate_offset_curves()
     });
 }
 
-void CurvesGenerator::sort_junction_curves()
+void SurfacesGenerator::sort_junction_curves()
 {
     for (auto &item : m_junction_to_curves)
     {
@@ -538,7 +538,7 @@ void CurvesGenerator::sort_junction_curves()
     }
 }
 
-void CurvesGenerator::generate_surfaces_from_junctions()
+void SurfacesGenerator::generate_surfaces_from_junctions()
 {
     for (const auto &junction_matcher : m_junction_to_curves)
     {
@@ -620,7 +620,7 @@ void CurvesGenerator::generate_surfaces_from_junctions()
     }
 }
 
-void CurvesGenerator::find_neighborhoods_intersections()
+void SurfacesGenerator::find_neighborhoods_intersections()
 {
     std::unordered_set<VertexDescriptor> passed_junctions;
     for (const auto &item : m_marked_junctions)
@@ -707,7 +707,7 @@ void CurvesGenerator::find_neighborhoods_intersections()
     }
 }
 
-void CurvesGenerator::generate_surfaces_from_curves()
+void SurfacesGenerator::generate_surfaces_from_curves()
 {
     for (const auto &curve_info : m_curves)
     {
@@ -766,7 +766,7 @@ void CurvesGenerator::generate_surfaces_from_curves()
     }
 }
 
-void CurvesGenerator::generate_boundary_points()
+void SurfacesGenerator::generate_boundary_points()
 {
     cv::Point boundaries[] = {cv::Point(0, 0), cv::Point(m_reference_image.cols - 1, 0),
                               cv::Point(0, m_reference_image.rows - 1),
@@ -869,7 +869,7 @@ void CurvesGenerator::generate_boundary_points()
     }
 }
 
-void CurvesGenerator::fill_holes()
+void SurfacesGenerator::fill_holes()
 {
     std::unordered_set<VertexDescriptor> passed_junctions;
     for (const auto &item : m_marked_junctions)
@@ -1028,7 +1028,7 @@ void CurvesGenerator::fill_holes()
     }
 }
 
-void CurvesGenerator::extrude_surfaces()
+void SurfacesGenerator::extrude_surfaces()
 {
     CagdVecStruct extrusion_vector = {0};
     extrusion_vector.Vec[0] = 0;
@@ -1040,8 +1040,8 @@ void CurvesGenerator::extrude_surfaces()
     }
 }
 
-std::vector<std::pair<std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>>> CurvesGenerator::split_junction_walk(
-    const std::pair<std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> &junction_walk)
+std::vector<std::pair<std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>>> SurfacesGenerator::
+    split_junction_walk(const std::pair<std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> &junction_walk)
 {
     if (junction_walk.first.size() < 4)
     {
@@ -1082,8 +1082,8 @@ std::vector<std::pair<std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>
     return {junction_walk};
 }
 
-void CurvesGenerator::generate_curve(const std::vector<VertexDescriptor> &route,
-                                     const std::vector<EdgeDescriptor> &route_edges)
+void SurfacesGenerator::generate_curve(const std::vector<VertexDescriptor> &route,
+                                       const std::vector<EdgeDescriptor> &route_edges)
 {
     VertexDescriptor junction = route.front();
     VertexDescriptor junction2 = (route.back() != route.front()) ? route.back() : -1;
@@ -1135,7 +1135,7 @@ void CurvesGenerator::generate_curve(const std::vector<VertexDescriptor> &route,
     m_height_curves.push_back(std::move(height_curve));
 }
 
-std::vector<IritPoint> CurvesGenerator::get_intersection_points(
+std::vector<IritPoint> SurfacesGenerator::get_intersection_points(
     const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher)
 {
     std::vector<IritPoint> points;
@@ -1317,8 +1317,8 @@ std::vector<IritPoint> CurvesGenerator::get_intersection_points(
     return points;
 }
 
-void CurvesGenerator::add_surface_from_4_points(const IritPoint &p0, const IritPoint &p1, const IritPoint &p2,
-                                                const IritPoint &p3)
+void SurfacesGenerator::add_surface_from_4_points(const IritPoint &p0, const IritPoint &p1, const IritPoint &p2,
+                                                  const IritPoint &p3)
 {
     std::vector<CagdPtStruct *> points = {p0.get(), p1.get(), p2.get(), p3.get()};
     do
@@ -1335,8 +1335,8 @@ void CurvesGenerator::add_surface_from_4_points(const IritPoint &p0, const IritP
     return;
 }
 
-void CurvesGenerator::add_surface_from_2_lines(const IritPoint &line0_p0, const IritPoint &line0_p1,
-                                               const IritPoint &line1_p0, const IritPoint &line1_p1)
+void SurfacesGenerator::add_surface_from_2_lines(const IritPoint &line0_p0, const IritPoint &line0_p1,
+                                                 const IritPoint &line1_p0, const IritPoint &line1_p1)
 {
     Curve curve1 = Curve(BzrCrvNew(2, CAGD_PT_E2_TYPE), CagdCrvFree);
     curve1->Points[1][0] = line0_p0->Pt[0];
@@ -1374,7 +1374,7 @@ void CurvesGenerator::add_surface_from_2_lines(const IritPoint &line0_p0, const 
     CagdPtFreeList(intersections);
 }
 
-int CurvesGenerator::distance_to_boundary(const cv::Point &point, int maximum_distance)
+int SurfacesGenerator::distance_to_boundary(const cv::Point &point, int maximum_distance)
 {
     for (int radius = 0; radius < maximum_distance; radius++)
     {
@@ -1394,7 +1394,7 @@ int CurvesGenerator::distance_to_boundary(const cv::Point &point, int maximum_di
     return maximum_distance;
 }
 
-cv::Point CurvesGenerator::closest_point_on_boundary(const cv::Point &point, int maximum_distance)
+cv::Point SurfacesGenerator::closest_point_on_boundary(const cv::Point &point, int maximum_distance)
 {
     for (int radius = 0; radius < maximum_distance; radius++)
     {
@@ -1414,7 +1414,7 @@ cv::Point CurvesGenerator::closest_point_on_boundary(const cv::Point &point, int
     return {-1, -1};
 }
 
-int CurvesGenerator::distance_in_boundary(const cv::Point &p0, const cv::Point &p1)
+int SurfacesGenerator::distance_in_boundary(const cv::Point &p0, const cv::Point &p1)
 {
     if (p0 == p1)
     {
@@ -1434,8 +1434,8 @@ int CurvesGenerator::distance_in_boundary(const cv::Point &p0, const cv::Point &
     return d[target] != 0 ? d[target] : std::numeric_limits<int>::max();
 }
 
-Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curve &width_curve,
-                                                  const Curve &curve_to_trim)
+Curve SurfacesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curve &width_curve,
+                                                    const Curve &curve_to_trim)
 {
     double start_point = -1;
     double end_point = -1;
@@ -1523,7 +1523,7 @@ Curve CurvesGenerator::trim_curve_to_fit_boundary(const Curve &curve, const Curv
     return Curve(wanted_curve, CagdCrvFree);
 }
 
-void CurvesGenerator::fix_offset_curves_surface_self_intersection(Curve &offset_curve, Curve &opposite_offset_curve)
+void SurfacesGenerator::fix_offset_curves_surface_self_intersection(Curve &offset_curve, Curve &opposite_offset_curve)
 {
     if (offset_curve == nullptr || opposite_offset_curve == nullptr)
     {
@@ -1583,8 +1583,8 @@ void CurvesGenerator::fix_offset_curves_surface_self_intersection(Curve &offset_
     }
 }
 
-void CurvesGenerator::fix_offset_curves_surface_self_intersection(Curve &offset_curve, Curve &connection_0_curve,
-                                                                  Curve &connection_1_curve)
+void SurfacesGenerator::fix_offset_curves_surface_self_intersection(Curve &offset_curve, Curve &connection_0_curve,
+                                                                    Curve &connection_1_curve)
 {
     CagdRType tail0 = 0;
     CagdRType tail1 = 1;
@@ -1634,7 +1634,7 @@ void CurvesGenerator::fix_offset_curves_surface_self_intersection(Curve &offset_
     offset_curve.reset(wanted_curve);
 }
 
-void CurvesGenerator::fix_surface_orientation(IritSurface &surface, bool print_error)
+void SurfacesGenerator::fix_surface_orientation(IritSurface &surface, bool print_error)
 {
     if (surface.get() == nullptr)
     {
@@ -1659,8 +1659,8 @@ void CurvesGenerator::fix_surface_orientation(IritSurface &surface, bool print_e
     }
 }
 
-IritSurface CurvesGenerator::generate_surface_from_pivot_and_points(const IritPoint &pivot, const IritPoint &p0,
-                                                                    const IritPoint &p1, double radius)
+IritSurface SurfacesGenerator::generate_surface_from_pivot_and_points(const IritPoint &pivot, const IritPoint &p0,
+                                                                      const IritPoint &p1, double radius)
 {
     if (m_point_to_originating_curve.count(p0.get()) == 0 || m_point_to_originating_curve.count(p1.get()) == 0 ||
         m_point_to_originating_curve[p0.get()].size() > 1 || m_point_to_originating_curve[p1.get()].size() > 1 ||
@@ -1736,13 +1736,13 @@ IritSurface CurvesGenerator::generate_surface_from_pivot_and_points(const IritPo
     }
 }
 
-std::unordered_set<VertexDescriptor> CurvesGenerator::get_marked_neighborhood(const VertexDescriptor &junction)
+std::unordered_set<VertexDescriptor> SurfacesGenerator::get_marked_neighborhood(const VertexDescriptor &junction)
 {
     std::unordered_set<VertexDescriptor> visited;
     return get_marked_neighborhood(junction, visited);
 }
 
-std::unordered_set<VertexDescriptor> CurvesGenerator::get_marked_neighborhood(
+std::unordered_set<VertexDescriptor> SurfacesGenerator::get_marked_neighborhood(
     const VertexDescriptor &junction, std::unordered_set<VertexDescriptor> &visited)
 {
     if (visited.count(junction) > 0)
@@ -1767,7 +1767,7 @@ std::unordered_set<VertexDescriptor> CurvesGenerator::get_marked_neighborhood(
     return neighborhood;
 }
 
-bool CurvesGenerator::compare_two_points_in_junction(
+bool SurfacesGenerator::compare_two_points_in_junction(
     const IritPoint &a, const IritPoint &b,
     const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher)
 {
@@ -1838,7 +1838,7 @@ bool CurvesGenerator::compare_two_points_in_junction(
     return std::distance(a_iter, b_iter) > 0;
 }
 
-bool CurvesGenerator::compare_two_curves_in_junction(
+bool SurfacesGenerator::compare_two_curves_in_junction(
     const CagdCrvStruct *a, const CagdCrvStruct *b,
     const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher)
 {
@@ -1847,7 +1847,7 @@ bool CurvesGenerator::compare_two_curves_in_junction(
     return std::distance(a_iter, b_iter) > 0;
 }
 
-bool CurvesGenerator::compare_point_and_curve_in_junction(
+bool SurfacesGenerator::compare_point_and_curve_in_junction(
     const IritPoint &a, const CagdCrvStruct *b,
     const std::pair<const VertexDescriptor, std::vector<CagdCrvStruct *>> &junction_matcher)
 {
@@ -1893,7 +1893,7 @@ bool CurvesGenerator::compare_point_and_curve_in_junction(
     return std::distance(a_iter, b_iter) > 0;
 }
 
-CagdRType CurvesGenerator::get_offset_curve_subdivision_param(CagdCrvStruct *offset_curve, VertexDescriptor junction)
+CagdRType SurfacesGenerator::get_offset_curve_subdivision_param(CagdCrvStruct *offset_curve, VertexDescriptor junction)
 {
     if (m_offset_curve_subdivision_params.count(offset_curve) > 0 &&
         m_offset_curve_subdivision_params[offset_curve].count(junction) > 0)
@@ -1910,7 +1910,7 @@ CagdRType CurvesGenerator::get_offset_curve_subdivision_param(CagdCrvStruct *off
                : 0;
 }
 
-std::vector<IritPoint> CurvesGenerator::get_neighborhood_points(
+std::vector<IritPoint> SurfacesGenerator::get_neighborhood_points(
     const std::unordered_set<VertexDescriptor> &neighborhood, std::vector<CagdCrvStruct *> &neighborhood_offset_curves)
 {
     std::unordered_map<VertexDescriptor, std::vector<std::variant<IritPoint, CagdCrvStruct *>>> neighborhood_points;
@@ -2116,7 +2116,7 @@ std::vector<IritPoint> CurvesGenerator::get_neighborhood_points(
     return neighborhood_points_vector;
 }
 
-std::tuple<CagdCrvStruct *, CagdRType, CagdRType> CurvesGenerator::get_points_matching_curve(
+std::tuple<CagdCrvStruct *, CagdRType, CagdRType> SurfacesGenerator::get_points_matching_curve(
     const std::vector<CagdCrvStruct *> &curves, const IritPoint &p0, const IritPoint &p1)
 {
     for (const auto &curve : curves)
