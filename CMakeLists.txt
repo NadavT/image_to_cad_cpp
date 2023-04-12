@@ -16,5 +16,11 @@ target_link_libraries(image_to_cad PUBLIC opencv_world argparse ${Irit_LIBRARIES
 target_include_directories(image_to_cad PRIVATE ${OpenCV_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${Irit_INCLUDE_DIRS})
 target_compile_definitions(image_to_cad PRIVATE ${Irit_COMPILE_DEFINITIONS} ${image_to_cad_CUSTOM_COMPILE_DEFINITIONS})
 
+add_executable(image_to_cad_preprocess preprocess.cpp preprocess_only_main.cpp)
+target_link_libraries(image_to_cad_preprocess PUBLIC opencv_world argparse)
+target_include_directories(image_to_cad_preprocess PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_compile_definitions(image_to_cad_preprocess PRIVATE ${image_to_cad_CUSTOM_COMPILE_DEFINITIONS})
+
 install(TARGETS image_to_cad COMPONENT image_to_cad RUNTIME DESTINATION .)
+install(TARGETS image_to_cad_preprocess COMPONENT image_to_cad RUNTIME DESTINATION .)
 install(FILES ${opencv_world_path} ${irit_dynamic_lib_path} COMPONENT image_to_cad DESTINATION .)
