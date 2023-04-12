@@ -4,19 +4,25 @@
 #include "utils.h"
 
 ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordered_set<Segment> &added_edges,
-                           double reduction_proximity, double hanging_threshold, double junction_collapse_threshold)
+                           double reduction_proximity, double hanging_threshold, double junction_collapse_threshold,
+                           double junction_smooth_threshold, int width, int height, bool add_border, Image &image,
+                           double scale_factor)
     : m_graph(graph)
     , m_vertex_descriptor_map(map)
     , m_added_edges(added_edges)
     , m_reduction_proximity(reduction_proximity)
     , m_hanging_threshold(hanging_threshold)
     , m_junction_collapse_threshold(junction_collapse_threshold)
+    , m_junction_smooth_threshold(junction_smooth_threshold)
+    , m_scale_factor(scale_factor)
 {
-    TIMED_INNER_FUNCTION(reduce(m_reduction_proximity), "Reducing graph");
-    TIMED_INNER_FUNCTION(remove_hanging(), "Removing hanging");
-    TIMED_INNER_FUNCTION(collapse_junctions(m_junction_collapse_threshold), "Collapsing junctions");
+    if (add_border)
+    {
+        TIMED_INNER_FUNCTION(remove_border(width, height, image), "Removing border from graph");
+    }
 
-    cv::Mat image_graph(2000, 4000, CV_8UC3, cv::Scalar(255, 255, 255));
+    TIMED_INNER_FUNCTION(reduce(m_reduction_proximity), "Reducing graph");
+    cv::Mat image_graph(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
 
     auto edges = boost::edges(m_graph);
 
@@ -27,7 +33,43 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
         cv::line(image_graph, u.p, v.p, cv::Scalar(0, 0, 255), 1);
     }
 
-    cv::imwrite("voronoi4.png", image_graph);
+    cv::imwrite("after_reduction.png", image_graph);
+
+    TIMED_INNER_FUNCTION(remove_hanging(width, height), "Removing hanging");
+    TIMED_INNER_FUNCTION(collapse_junctions(m_junction_collapse_threshold), "Collapsing junctions");
+    TIMED_INNER_FUNCTION(smooth_junctions(m_junction_smooth_threshold), "Smoothing junctions");
+
+    image_graph = cv::Mat(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
+
+    edges = boost::edges(m_graph);
+
+    for (auto it = edges.first; it != edges.second; ++it)
+    {
+        const Vertex &u = m_graph[boost::source(*it, m_graph)];
+        const Vertex &v = m_graph[boost::target(*it, m_graph)];
+        cv::line(image_graph, u.p, v.p, cv::Scalar(u.distance_to_source, 0, 255), 1);
+    }
+
+    cv::imwrite("final_graph_processing.png", image_graph);
+}
+
+void ProcessGraph::remove_border(int width, int height, Image &image)
+{
+    // Iterate over all vertices
+    auto vertices = boost::vertices(m_graph);
+    for (auto it = vertices.first; it != vertices.second; ++it)
+    {
+        Vertex &vertex = m_graph[*it];
+        if (vertex.p.x <= 2 * m_scale_factor || vertex.p.y <= 2 * m_scale_factor ||
+            vertex.p.x >= width - 2 * m_scale_factor - 1 || vertex.p.y >= height - 2 * m_scale_factor - 1)
+        {
+            boost::clear_vertex(*it, m_graph);
+        }
+    }
+    cv::Rect roi = cv::Rect(2 * m_scale_factor, 2 * m_scale_factor, image.cols - 4 * m_scale_factor,
+                            image.rows - 4 * m_scale_factor);
+    image = image(roi);
+    cv::imwrite("after_border_removal.png", image);
 }
 
 void ProcessGraph::reduce(double reduction_proximity)
@@ -85,7 +127,7 @@ void ProcessGraph::reduce(double reduction_proximity)
     }
 }
 
-void ProcessGraph::remove_hanging()
+void ProcessGraph::remove_hanging(int width, int height)
 {
     bool changed = true;
     int i = 0;
@@ -142,9 +184,8 @@ void ProcessGraph::remove_hanging()
             }
         }
         m_graph = new_graph;
-        reduce(4);
 
-        cv::Mat image_graph(2000, 4000, CV_8UC3, cv::Scalar(255, 255, 255));
+        cv::Mat image_graph(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
 
         auto edges = boost::edges(m_graph);
 
@@ -161,8 +202,78 @@ void ProcessGraph::remove_hanging()
 
 void ProcessGraph::collapse_junctions(double junction_collapse_threshold)
 {
+    bool changed = true;
+    while (changed)
+    {
+        changed = false;
+        std::vector<VertexDescriptor> junctions = get_junctions();
+        std::unordered_set<VertexDescriptor> collapsed;
+
+        for (VertexDescriptor junction : junctions)
+        {
+            if (collapsed.count(junction) > 0)
+            {
+                continue;
+            }
+            bool reset = true;
+            while (reset)
+            {
+                reset = false;
+                for (const auto &neighbor : boost::make_iterator_range(boost::adjacent_vertices(junction, m_graph)))
+                {
+                    double length = 0;
+                    std::vector<VertexDescriptor> route;
+                    std::tie(length, route, std::ignore) = walk_to_next_junction(junction, neighbor, m_graph);
+                    if (length < junction_collapse_threshold)
+                    {
+                        for (const auto &vertex : route)
+                        {
+                            if (vertex == junction || vertex == route.back())
+                            {
+                                collapsed.insert(vertex);
+                                continue;
+                            }
+                            boost::clear_vertex(vertex, m_graph);
+                        }
+                        contract_vertices(junction, route.back());
+                        m_graph[junction].p = (m_graph[junction].p + m_graph[route.back()].p) / 2;
+                        auto incident_segment = m_graph[junction].incident_segment;
+                        m_graph[junction].distance_to_source =
+                            distance_to_edge(m_graph[junction].p, incident_segment[0], incident_segment[1]);
+                        smooth_neighbors(junction, length);
+                        reset = true;
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void ProcessGraph::smooth_junctions(double smooth_distance)
+{
+    std::vector<VertexDescriptor> junctions = get_junctions();
+    for (VertexDescriptor junction : junctions)
+    {
+        double min_distance = std::numeric_limits<double>::max();
+        for (const auto &neighbor : boost::make_iterator_range(boost::adjacent_vertices(junction, m_graph)))
+        {
+            double junction_distance;
+            std::tie(junction_distance, std::ignore, std::ignore) = walk_to_next_junction(junction, neighbor, m_graph);
+            if (junction_distance < min_distance)
+            {
+                min_distance = junction_distance;
+            }
+        }
+        smooth_distance = std::min(smooth_distance, min_distance / 4);
+        smooth_neighbors(junction, smooth_distance);
+    }
+}
+
+std::vector<VertexDescriptor> ProcessGraph::get_junctions()
+{
     std::vector<VertexDescriptor> junctions;
-    std::set<VertexDescriptor> collapsed;
     for (const auto &vertex : boost::make_iterator_range(boost::vertices(m_graph)))
     {
         if (boost::degree(vertex, m_graph) > 2)
@@ -171,48 +282,11 @@ void ProcessGraph::collapse_junctions(double junction_collapse_threshold)
         }
     }
 
-    for (VertexDescriptor junction : junctions)
-    {
-        if (collapsed.count(junction) > 0)
-        {
-            continue;
-        }
-        bool reset = true;
-        while (reset)
-        {
-            reset = false;
-            for (const auto &neighbor : boost::make_iterator_range(boost::adjacent_vertices(junction, m_graph)))
-            {
-                double length = 0;
-                std::vector<VertexDescriptor> route;
-                std::tie(length, route, std::ignore) = walk_to_next_junction(junction, neighbor, m_graph);
-                if (length < junction_collapse_threshold)
-                {
-                    for (const auto &vertex : route)
-                    {
-                        if (vertex == junction || vertex == route.back())
-                        {
-                            collapsed.insert(vertex);
-                            continue;
-                        }
-                        boost::clear_vertex(vertex, m_graph);
-                    }
-                    contract_vertices(junction, route.back());
-                    m_graph[junction].p = (m_graph[junction].p + m_graph[route.back()].p) / 2;
-                    auto incident_segment = m_graph[junction].incident_segment;
-                    m_graph[junction].distance_to_source =
-                        distance_to_edge(m_graph[junction].p, incident_segment[0], incident_segment[1]);
-                    smooth_neighbors(junction, length);
-                    reset = true;
-                    break;
-                }
-            }
-        }
-    }
+    return junctions;
 }
 
 std::tuple<double, std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> ProcessGraph::walk_to_next_junction(
-    VertexDescriptor source, VertexDescriptor direction, const Graph &graph)
+    VertexDescriptor source, VertexDescriptor direction, const Graph &graph, bool get_cycle)
 {
     std::vector<VertexDescriptor> route({source, direction});
     std::vector<EdgeDescriptor> route_edges;
@@ -227,6 +301,7 @@ std::tuple<double, std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> P
     double length = distance(graph[source].p, graph[direction].p);
     VertexDescriptor parent = direction;
     VertexDescriptor prev = source;
+    std::unordered_set<VertexDescriptor> visited({source, direction});
     while (boost::degree(parent, graph) == 2)
     {
         auto temp = parent;
@@ -237,9 +312,20 @@ std::tuple<double, std::vector<VertexDescriptor>, std::vector<EdgeDescriptor>> P
             ++edge;
             parent = (boost::source(*edge, graph) == temp) ? boost::target(*edge, graph) : boost::source(*edge, graph);
         }
+        if (visited.count(parent) > 0)
+        {
+            if (get_cycle)
+            {
+                route.push_back(parent);
+                route_edges.push_back(*edge);
+                length += graph[*edge];
+            }
+            break;
+        }
         route.push_back(parent);
         route_edges.push_back(*edge);
         length += graph[*edge];
+        visited.insert(parent);
         prev = temp;
     }
 
@@ -317,7 +403,7 @@ void ProcessGraph::contract_vertices(VertexDescriptor vertex1, VertexDescriptor 
             continue;
         }
 
-        assert(vertex1.p != collapsed.p);
+        assert(vertex1_details.p != collapsed.p);
         assert(m_vertex_descriptor_map.count(collapsed.p) > 0);
         assert(vertex1 != m_vertex_descriptor_map[collapsed.p]);
         assert(vertex1 != vertex2);
@@ -341,7 +427,9 @@ void ProcessGraph::smooth_neighbors(VertexDescriptor vertex, double distance)
             {
                 VertexDescriptor neighbor = (boost::source(edge, m_graph) == vertex) ? boost::target(edge, m_graph)
                                                                                      : boost::source(edge, m_graph);
+                // double neighbor_distance = m_graph[neighbor].distance_to_source;
                 contract_vertices(vertex, neighbor);
+                // m_graph[vertex].distance_to_source = neighbor_distance;
                 changed = true;
                 break;
             }

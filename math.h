@@ -2,26 +2,45 @@
 #define MATH_H
 
 #include <cmath>
+#include <inc_irit/irit_sm.h>
 #include <opencv2/opencv.hpp>
 
-static inline double distance(cv::Point p1, cv::Point p2)
+
+template <typename T> static inline double distance_squared(T p1, T p2)
 {
-    return std::sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y));
+    return (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y);
 }
 
-static inline double distance_to_edge(cv::Point point, cv::Point edge_start, cv::Point edge_end)
+template <typename T> static inline double distance(T p1, T p2)
 {
-    double x1 = edge_start.x;
-    double y1 = edge_start.y;
-    double x2 = edge_end.x;
-    double y2 = edge_end.y;
-    double x0 = point.x;
-    double y0 = point.y;
+    return std::sqrt(distance_squared(p1, p2));
+}
 
-    double numerator = std::abs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1));
-    double denominator = std::sqrt(std::pow(y2 - y1, 2) + std::pow(x2 - x1, 2));
+template <typename T> static inline double distance_to_edge(T point, T edge_start, T edge_end)
+{
+    double length_squared = distance_squared(edge_start, edge_end);
+    cv::norm(edge_end - edge_start);
+    if (length_squared == 0)
+    {
+        return distance(point, edge_start);
+    }
+    double t = std::clamp((point - edge_start).dot(edge_end - edge_start) / length_squared, 0.0, 1.0);
+    T projection = edge_start + t * (edge_end - edge_start);
 
-    return numerator / denominator;
+    return distance(point, projection);
+}
+
+template <typename T> static inline double angle_between(T p0, T midpoint, T p1)
+{
+    T v1 = p0 - midpoint;
+    T v2 = midpoint - p1;
+    double dot = v1.dot(v2);
+    return std::acos(dot / (cv::norm(v1) * cv::norm(v2)));
+}
+
+static inline double degrees_to_radians(double degrees)
+{
+    return degrees * M_PI / 180.0;
 }
 
 #endif /* MATH_H */

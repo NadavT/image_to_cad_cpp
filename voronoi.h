@@ -16,7 +16,7 @@ typedef boost::polygon::voronoi_cell<int>::source_category_type source_category_
 class VoronoiCalculator
 {
   public:
-    VoronoiCalculator(const Image &image, const Segments &segments);
+    VoronoiCalculator(Image &image, const Image &grayscale_image);
 
     VoronoiDiagram &get_diagram();
     Graph &get_graph();
@@ -24,6 +24,7 @@ class VoronoiCalculator
     std::unordered_set<Segment> &get_added_edges();
 
   private:
+    void find_segments();
     void calculate();
     bool check_mask(int x, int y);
     void draw_graph();
@@ -33,8 +34,10 @@ class VoronoiCalculator
     void sample_curved_edge(const edge_type &edge, std::vector<point_type> *sampled_edge);
 
   private:
-    const Image &m_image;
-    const Segments &m_segments;
+    Image &m_image;
+    const Image &m_grayscale_image;
+    Segments m_segments;
+    std::vector<cv::Vec4i> m_hierarchy;
     VoronoiDiagram m_diagram;
     Graph m_graph;
     VertexDescriptorMap m_vertex_descriptor_map;
