@@ -61,7 +61,10 @@ int main(int argc, char **argv)
         .default_value(25.0)
         .scan<'g', double>();
     program.add_argument("-s", "--scale").help("Scale factor").default_value(4.0).scan<'g', double>();
-    program.add_argument("-b", "--border").help("Should add border").default_value(false).implicit_value(true);
+    program.add_argument("-b", "--border")
+        .help("Should add border (Should match with generated preprocessed image)")
+        .default_value(false)
+        .implicit_value(true);
     program.add_argument("-r", "--reduction_proximity")
         .help("Reduction proximity")
         .default_value(10.0)
