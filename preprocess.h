@@ -4,7 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 
-#include "types.h"
+using Image = cv::Mat;
 
 class PreprocessImage
 {
@@ -13,10 +13,7 @@ class PreprocessImage
                     int crop_to_fit_pad_left, int crop_to_fit_pad_right, int crop_to_fit_pad_top,
                     int crop_to_fit_pad_bottom, double island_threshold, bool should_add_border, double scale_factor);
 
-    Image &get_colored_image();
     Image &get_grayscale_image();
-    Segments &get_segments();
-    std::vector<cv::Vec4i> &get_hierarchy();
 
   private:
     void convert_to_black_and_white();
@@ -27,13 +24,9 @@ class PreprocessImage
     std::list<cv::Point> get_near_surrounding(int x, int y, int color);
     std::vector<cv::Point> count_surrounding(int x, int y, int color);
     void remove_islands();
-    void find_segments();
 
   private:
-    Image m_colored_image;
     Image m_grayscale_image;
-    Segments m_segments;
-    std::vector<cv::Vec4i> m_hierarchy;
     double m_scale_factor;
     double m_island_threshold;
 

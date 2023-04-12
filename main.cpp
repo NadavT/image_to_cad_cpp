@@ -28,12 +28,16 @@ int main(int argc, char **argv)
         return load_image(value);
     });
     program.add_argument("-o", "--output_dir").help("Output directory").default_value(std::string("results"));
+    program.add_argument("-no_pp", "--no_preprocessing")
+        .help("Should not apply preprocessing to input image")
+        .default_value(false)
+        .implicit_value(true);
     program.add_argument("-no_cbw", "--no_convert_to_black_and_white")
-        .help("Should convert to black and white")
+        .help("Should not convert to black and white")
         .default_value(false)
         .implicit_value(true);
     program.add_argument("-no_cft", "--no_crop_to_fit")
-        .help("Should crop to fit")
+        .help("Should not crop to fit")
         .default_value(false)
         .implicit_value(true);
     program.add_argument("-ctf_pl", "--crop_to_fit_padding_left")
@@ -57,6 +61,7 @@ int main(int argc, char **argv)
         .default_value(25.0)
         .scan<'g', double>();
     program.add_argument("-s", "--scale").help("Scale factor").default_value(4.0).scan<'g', double>();
+    program.add_argument("-b", "--border").help("Should add border").default_value(false).implicit_value(true);
     program.add_argument("-r", "--reduction_proximity")
         .help("Reduction proximity")
         .default_value(10.0)
@@ -73,7 +78,6 @@ int main(int argc, char **argv)
         .help("Junction smooth threshold")
         .default_value(10.0)
         .scan<'g', double>();
-    program.add_argument("-b", "--border").help("Should add border").default_value(false).implicit_value(true);
     program.add_argument("-co", "--curve_order")
         .help("Assign the maximal order of the curve (B-Spline), use -1 to unlimited (Bezier curve)")
         .default_value(100)
@@ -82,6 +86,18 @@ int main(int argc, char **argv)
         .help("Assign the target order of the curve (B-Spline), use -1 to unlimited (Bezier curve)")
         .default_value(4)
         .scan<'i', int>();
+    program.add_argument("-cd", "--curve_density")
+        .help("density of the curves (number of points per unit length of arc)")
+        .default_value(0.1)
+        .scan<'g', double>();
+    program.add_argument("-cml", "--curve_min_length")
+        .help("minimum control points of the curves")
+        .default_value(3)
+        .scan<'i', int>();
+    program.add_argument("-jra", "--junction_radius_adder")
+        .help("The radius of the junctions will be increased by this value (for treaming the outgoing curves")
+        .default_value(6.0)
+        .scan<'g', double>();
     program.add_argument("-ex", "--extrusion").help("Extrusion amount").default_value(25.0).scan<'g', double>();
     program.add_argument("-foc", "--filter_offset_curves")
         .help("Should filter offset curves")
@@ -103,18 +119,6 @@ int main(int argc, char **argv)
         .help("distance in boundary factor")
         .default_value(10.0)
         .scan<'g', double>();
-    program.add_argument("-cd", "--curve_density")
-        .help("density of the curves (number of points per unit length of arc)")
-        .default_value(0.1)
-        .scan<'g', double>();
-    program.add_argument("-cml", "--curve_min_length")
-        .help("minimum control points of the curves")
-        .default_value(3)
-        .scan<'i', int>();
-    program.add_argument("-jra", "--junction_radius_adder")
-        .help("The radius of the junctions will be increased by this value (for treaming the outgoing curves")
-        .default_value(6.0)
-        .scan<'g', double>();
 
     try
     {
@@ -133,36 +137,42 @@ int main(int argc, char **argv)
     }
     std::filesystem::current_path(program.get<std::string>("--output_dir"));
 
-    Image image = program.get<Image>("--input");
-    cv::imwrite("original.png", image);
+    Image grayscale_image = program.get<Image>("--input");
+    cv::imwrite("original.png", grayscale_image);
 
-    TIMED_FUNCTION(PreprocessImage preprocess_image(
-                       image, !program.get<bool>("--no_convert_to_black_and_white"),
-                       !program.get<bool>("--no_crop_to_fit"), program.get<int>("--crop_to_fit_padding_left"),
-                       program.get<int>("--crop_to_fit_padding_right"), program.get<int>("--crop_to_fit_padding_top"),
-                       program.get<int>("--crop_to_fit_padding_bottom"), program.get<double>("--islands_threshold"),
-                       program.get<bool>("--border"), program.get<double>("--scale")),
-                   "Preprocessing");
-    TIMED_FUNCTION(
-        VoronoiCalculator voronoi_calculator(preprocess_image.get_colored_image(), preprocess_image.get_segments()),
-        "Calculating Voronoi");
+    if (!program.get<bool>("--no_preprocessing"))
+    {
+        TIMED_FUNCTION(PreprocessImage preprocess_image(
+                           grayscale_image, !program.get<bool>("--no_convert_to_black_and_white"),
+                           !program.get<bool>("--no_crop_to_fit"), program.get<int>("--crop_to_fit_padding_left"),
+                           program.get<int>("--crop_to_fit_padding_right"),
+                           program.get<int>("--crop_to_fit_padding_top"),
+                           program.get<int>("--crop_to_fit_padding_bottom"), program.get<double>("--islands_threshold"),
+                           program.get<bool>("--border"), program.get<double>("--scale")),
+                       "Preprocessing");
+        grayscale_image = preprocess_image.get_grayscale_image();
+    }
+
+    Image colored_image;
+    cv::cvtColor(grayscale_image, colored_image, cv::COLOR_GRAY2BGR);
+
+    TIMED_FUNCTION(VoronoiCalculator voronoi_calculator(colored_image, grayscale_image), "Calculating Voronoi");
     TIMED_FUNCTION(ProcessGraph process_graph(
                        voronoi_calculator.get_graph(), voronoi_calculator.get_vertex_descriptor_map(),
                        voronoi_calculator.get_added_edges(), program.get<double>("--reduction_proximity"),
                        program.get<double>("--hanging_leaf_threshold"),
                        program.get<double>("--junction_collapse_threshold"),
-                       program.get<double>("--junction_smooth_threshold"), preprocess_image.get_colored_image().cols,
-                       preprocess_image.get_colored_image().rows, program.get<bool>("--border"),
-                       preprocess_image.get_colored_image(), program.get<double>("--scale")),
+                       program.get<double>("--junction_smooth_threshold"), colored_image.cols, colored_image.rows,
+                       program.get<bool>("--border"), colored_image, program.get<double>("--scale")),
                    "Processing graph");
     TIMED_FUNCTION(
         CurvesGenerator curves_generator(
             process_graph.get_graph(), program.get<int>("--curve_order"), program.get<int>("--target_curve_order"),
-            program.get<double>("--extrusion"), program.get<bool>("--filter_offset_curves"),
-            preprocess_image.get_colored_image(), program.get<int>("--distance_to_boundary_samples"),
-            program.get<int>("--distance_to_boundary_threshold"), program.get<double>("--distance_in_boundary_backoff"),
-            program.get<double>("--distance_in_boundary_factor"), program.get<double>("--curve_density"),
-            program.get<int>("--curve_min_length"), program.get<double>("--junction_radius_adder")),
+            program.get<double>("--extrusion"), program.get<bool>("--filter_offset_curves"), colored_image,
+            program.get<int>("--distance_to_boundary_samples"), program.get<int>("--distance_to_boundary_threshold"),
+            program.get<double>("--distance_in_boundary_backoff"), program.get<double>("--distance_in_boundary_factor"),
+            program.get<double>("--curve_density"), program.get<int>("--curve_min_length"),
+            program.get<double>("--junction_radius_adder")),
         "Generating curves");
     TIMED_FUNCTION(curves_generator.write_curves("curves.itd"), "Exporting curves to file");
     TIMED_FUNCTION(curves_generator.write_offset_curves_before_trim("offset_curves_before_trim.itd"),

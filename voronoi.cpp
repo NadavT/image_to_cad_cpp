@@ -67,12 +67,61 @@ template <> struct segment_mutable_traits<std::vector<cv::Point>>
 } // namespace polygon
 } // namespace boost
 
-VoronoiCalculator::VoronoiCalculator(const Image &image, const Segments &segments)
+VoronoiCalculator::VoronoiCalculator(Image &image, const Image &grayscale_image)
     : m_image(image)
-    , m_segments(segments)
+    , m_grayscale_image(grayscale_image)
 {
+    TIMED_INNER_FUNCTION(find_segments(), "Finding segments");
     TIMED_INNER_FUNCTION(calculate(), "Calculating voronoi");
     TIMED_INNER_FUNCTION(draw_graph(), "Drawing voronoi graph");
+}
+
+void VoronoiCalculator::find_segments()
+{
+    cv::Mat edged;
+    std::vector<std::vector<cv::Point>> contours;
+
+    cv::Canny(m_grayscale_image, edged, 30, 200);
+
+    cv::findContours(edged, contours, m_hierarchy, cv::RETR_LIST, cv::CHAIN_APPROX_NONE);
+    contours.reserve(contours.size() + 4);
+
+    std::vector<cv::Point> line1(m_grayscale_image.rows);
+    int i = 0;
+    std::generate(line1.begin(), line1.end(), [&]() { return cv::Point(0, i++); });
+    contours.push_back(line1);
+
+    std::vector<cv::Point> line2(m_grayscale_image.cols);
+    i = 0;
+    std::generate(line2.begin(), line2.end(), [&]() { return cv::Point(i++, 0); });
+    contours.push_back(line2);
+
+    std::vector<cv::Point> line3(m_grayscale_image.rows);
+    i = 0;
+    std::generate(line3.begin(), line3.end(), [&]() { return cv::Point(m_grayscale_image.cols - 1, i++); });
+    contours.push_back(line3);
+
+    std::vector<cv::Point> line4(m_grayscale_image.cols);
+    i = 0;
+    std::generate(line4.begin(), line4.end(), [&]() { return cv::Point(i++, m_grayscale_image.rows - 1); });
+    contours.push_back(line4);
+
+    for (const auto &contour : contours)
+    {
+        const cv::Point *prev = nullptr;
+        for (const cv::Point &point : contour)
+        {
+            if (prev)
+            {
+                m_segments.push_back({*prev, point});
+            }
+            prev = &point;
+        }
+    }
+
+    m_segments.shrink_to_fit();
+    cv::drawContours(m_image, m_segments, -1, {0xff, 0, 0}, 1);
+    cv::imwrite("contours.png", m_image);
 }
 
 VoronoiDiagram &VoronoiCalculator::get_diagram()
