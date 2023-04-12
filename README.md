@@ -54,8 +54,9 @@ Open a supported build shell (`x64 Native Tools Command Prompt`/`Developer Comma
 mkdir install
 mkdir build && cd build
 cmake -DCMAKE_INSTALL_PREFIX="../install" -DCMAKE_BUILD_TYPE=Release -G "NMake Makefiles" ..
-cmake --build . --target image_to_cad -j 6
+cmake --build . --target image_to_cad image_to_cad_preprocess -j 6
 cmake --install . --component image_to_cad
+cmake --install . --component image_to_cad_preprocess
 ```
 
 #### using ninja - preferred if installed (support parallel compilation):
@@ -64,8 +65,9 @@ cmake --install . --component image_to_cad
 mkdir install
 mkdir build && cd build
 cmake -DCMAKE_INSTALL_PREFIX="../install" -DCMAKE_BUILD_TYPE=Release -G "Ninja" ..
-cmake --build . --target image_to_cad -j 6
+cmake --build . --target image_to_cad image_to_cad_preprocess -j 6
 cmake --install . --component image_to_cad
+cmake --install . --component image_to_cad_preprocess
 ```
 
 ### Linux
@@ -76,8 +78,9 @@ Open any shell with `cmake`, supported compiler and generator in the path, and r
 mkdir install
 mkdir build && cd build
 cmake -DCMAKE_INSTALL_PREFIX="../install" -DCMAKE_BUILD_TYPE=Release ..
-cmake --build . --target image_to_cad -j 6
+cmake --build . --target image_to_cad image_to_cad_preprocess -j 6
 cmake --install . --component image_to_cad
+cmake --install . --component image_to_cad_preprocess
 ```
 
 # Running the program

@@ -22,5 +22,6 @@ target_include_directories(image_to_cad_preprocess PRIVATE ${OpenCV_INCLUDE_DIRS
 target_compile_definitions(image_to_cad_preprocess PRIVATE ${image_to_cad_CUSTOM_COMPILE_DEFINITIONS})
 
 install(TARGETS image_to_cad COMPONENT image_to_cad RUNTIME DESTINATION .)
-install(TARGETS image_to_cad_preprocess COMPONENT image_to_cad RUNTIME DESTINATION .)
 install(FILES ${opencv_world_path} ${irit_dynamic_lib_path} COMPONENT image_to_cad DESTINATION .)
+install(TARGETS image_to_cad_preprocess COMPONENT image_to_cad_preprocess RUNTIME DESTINATION .)
+install(FILES ${opencv_world_path} COMPONENT image_to_cad_preprocess DESTINATION .)
