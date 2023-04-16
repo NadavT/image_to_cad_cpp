@@ -54,15 +54,15 @@ if(WIN32)
 	else()
 		if(CMAKE_BUILD_TYPE MATCHES Debug)
 			find_library(Irit_LIBRARIES NAMES IritD HINTS
-				"${IRIT64_ROOT}/../lib64"
-				"${IRIT_ROOT}/../lib64")
+				"${IRIT64_ROOT}/../lib"
+				"${IRIT_ROOT}/../lib")
 			find_file(irit_dynamic_lib_path NAMES IritD.dll HINTS
 				"${IRIT64_ROOT}"
 				"${IRIT_ROOT}")
 		else()
 			find_library(Irit_LIBRARIES NAMES Irit HINTS
-				"${IRIT64_ROOT}/../lib64"
-				"${IRIT_ROOT}/../lib64")
+				"${IRIT64_ROOT}/../lib"
+				"${IRIT_ROOT}/../lib")
 			find_file(irit_dynamic_lib_path NAMES Irit.dll HINTS
 				"${IRIT64_ROOT}"
 				"${IRIT_ROOT}")
