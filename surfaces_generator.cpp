@@ -589,7 +589,7 @@ void SurfacesGenerator::generate_surfaces_from_junctions()
         if (points.size() == 3)
         {
             IritSurface surface = IritSurface(
-                CagdBilinearSrf(points[0].get(), points[1].get(), points[2].get(), points[1].get(), CAGD_PT_E2_TYPE),
+                CagdBilinearSrf(points[0].get(), points[1].get(), points[2].get(), points[2].get(), CAGD_PT_E2_TYPE),
                 CagdSrfFree);
             fix_surface_orientation(surface);
             if (surface != nullptr)
@@ -628,7 +628,7 @@ void SurfacesGenerator::generate_surfaces_from_junctions()
                 else
                 {
                     surface = IritSurface(
-                        CagdBilinearSrf(points[i].get(), pivot.get(), points[j].get(), pivot.get(), CAGD_PT_E2_TYPE),
+                        CagdBilinearSrf(points[i].get(), points[j].get(), pivot.get(), pivot.get(), CAGD_PT_E2_TYPE),
                         CagdSrfFree);
                     fix_surface_orientation(surface);
                     if (surface != nullptr)
@@ -1004,7 +1004,7 @@ void SurfacesGenerator::fill_holes()
                     }
                     else
                     {
-                        surface.reset(CagdBilinearSrf(prev_point.get(), pivot.get(), current_point.get(), pivot.get(),
+                        surface.reset(CagdBilinearSrf(prev_point.get(), current_point.get(), pivot.get(), pivot.get(),
                                                       CAGD_PT_E2_TYPE));
                         // Approximation isn't good enough and middle points are problematic to other polygons
                         // int proximity;
@@ -1041,7 +1041,7 @@ void SurfacesGenerator::fill_holes()
                 }
                 else
                 {
-                    surface.reset(CagdBilinearSrf(prev_point.get(), pivot.get(), current_point.get(), pivot.get(),
+                    surface.reset(CagdBilinearSrf(prev_point.get(), current_point.get(), pivot.get(), pivot.get(),
                                                   CAGD_PT_E2_TYPE));
                 }
                 fix_surface_orientation(surface);
@@ -1698,7 +1698,7 @@ IritSurface SurfacesGenerator::generate_surface_from_pivot_and_points(const Irit
         std::get<1>(m_point_to_originating_curve[p0.get()][0]) == nullptr ||
         std::get<1>(m_point_to_originating_curve[p1.get()][0]) == nullptr)
     {
-        return IritSurface(CagdBilinearSrf(p0.get(), pivot.get(), p1.get(), pivot.get(), CAGD_PT_E2_TYPE), CagdSrfFree);
+        return IritSurface(CagdBilinearSrf(p0.get(), p1.get(), pivot.get(), pivot.get(), CAGD_PT_E2_TYPE), CagdSrfFree);
     }
     else
     {
