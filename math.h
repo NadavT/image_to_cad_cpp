@@ -5,7 +5,6 @@
 #include <inc_irit/irit_sm.h>
 #include <opencv2/opencv.hpp>
 
-
 template <typename T> static inline double distance_squared(T p1, T p2)
 {
     return (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y);
@@ -22,12 +21,12 @@ template <typename T> static inline double distance_to_edge(T point, T edge_star
     cv::norm(edge_end - edge_start);
     if (length_squared == 0)
     {
-        return distance(point, edge_start);
+        return distance(cv::Point2d(point), cv::Point2d(edge_start));
     }
     double t = std::clamp((point - edge_start).dot(edge_end - edge_start) / length_squared, 0.0, 1.0);
-    T projection = edge_start + t * (edge_end - edge_start);
+    cv::Point2d projection = cv::Point2d(edge_start) + t * cv::Point2d(edge_end - edge_start);
 
-    return distance(point, projection);
+    return distance(cv::Point2d(point), projection);
 }
 
 template <typename T> static inline double angle_between(T p0, T midpoint, T p1)
