@@ -58,14 +58,22 @@ SurfacesGenerator::SurfacesGenerator(Graph &graph, int max_order, int target_ord
     }
     TIMED_INNER_FUNCTION(generate_curves(), "Generating curves");
     TIMED_INNER_FUNCTION(decrease_curves_order(), "Decrease curves order");
+    TIMED_INNER_FUNCTION(write_curves("curves.itd"), "Exporting curves to file");
     TIMED_INNER_FUNCTION(generate_offset_curves(), "Generating offset curves");
+    TIMED_INNER_FUNCTION(write_offset_curves("offset_curves.itd"), "Exporting offset curves to file");
+    TIMED_INNER_FUNCTION(write_offset_curves_before_trim("offset_curves_before_trim.itd"),
+                         "Exporting offset curves before trim to file");
+    TIMED_INNER_FUNCTION(write_filtered_offset_curves("filtered_offset_curves.itd"),
+                         "Exporting filtered offset curves to file");
     TIMED_INNER_FUNCTION(sort_junction_curves(), "Sorting junction curves");
     TIMED_INNER_FUNCTION(generate_boundary_points(), "Generating boundary points");
     TIMED_INNER_FUNCTION(generate_surfaces_from_junctions(), "Generating surfaces from junctions");
     TIMED_INNER_FUNCTION(find_neighborhoods_intersections(), "Finding neighborhoods intersections");
     TIMED_INNER_FUNCTION(fill_holes(), "Filling holes");
     TIMED_INNER_FUNCTION(generate_surfaces_from_curves(), "Generating surfaces from curves");
+    TIMED_INNER_FUNCTION(write_surfaces("surfaces.itd"), "Exporting surfaces to file");
     TIMED_INNER_FUNCTION(extrude_surfaces(), "Extruding surfaces");
+    TIMED_INNER_FUNCTION(write_extrusions("extrusions.itd"), "Exporting extrusions to file");
 }
 
 void SurfacesGenerator::write_curves(const std::string &filename)

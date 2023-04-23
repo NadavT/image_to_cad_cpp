@@ -179,14 +179,6 @@ int main(int argc, char **argv)
             program.get<double>("--curve_density"), program.get<int>("--curve_min_length"),
             program.get<double>("--junction_radius_adder")),
         "Generating surfaces");
-    TIMED_FUNCTION(curves_generator.write_curves("curves.itd"), "Exporting curves to file");
-    TIMED_FUNCTION(curves_generator.write_offset_curves_before_trim("offset_curves_before_trim.itd"),
-                   "Exporting offset curves before trim to file");
-    TIMED_FUNCTION(curves_generator.write_offset_curves("offset_curves.itd"), "Exporting offset curves to file");
-    TIMED_FUNCTION(curves_generator.write_filtered_offset_curves("filtered_offset_curves.itd"),
-                   "Exporting filtered offset curves to file");
-    TIMED_FUNCTION(curves_generator.write_surfaces("surfaces.itd"), "Exporting surfaces to file");
-    TIMED_FUNCTION(curves_generator.write_extrusions("extrusions.itd"), "Exporting extrusions to file");
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
