@@ -525,24 +525,37 @@ void SurfacesGenerator::sort_junction_curves()
     for (auto &item : m_junction_to_curves)
     {
         const cv::Point &junction_point = m_graph[item.first].p;
-        std::sort(item.second.begin(), item.second.end(),
-                  [junction_point](const CagdCrvStruct *a, const CagdCrvStruct *b) {
-                      cv::Point a_point = cv::Point(a->Points[1][1], a->Points[2][1]);
-                      if (distance(a_point, junction_point) >
-                          distance(cv::Point(a->Points[1][a->Length - 2], a->Points[2][a->Length - 2]), junction_point))
-                      {
-                          a_point = cv::Point(a->Points[1][a->Length - 2], a->Points[2][a->Length - 2]);
-                      }
-                      cv::Point b_point = cv::Point(b->Points[1][1], b->Points[2][1]);
-                      if (distance(b_point, junction_point) >
-                          distance(cv::Point(b->Points[1][b->Length - 2], b->Points[2][b->Length - 2]), junction_point))
-                      {
-                          b_point = cv::Point(b->Points[1][b->Length - 2], b->Points[2][b->Length - 2]);
-                      }
-                      double a_cartesian = std::atan2(a_point.y - junction_point.y, a_point.x - junction_point.x);
-                      double b_cartesian = std::atan2(b_point.y - junction_point.y, b_point.x - junction_point.x);
-                      return a_cartesian < b_cartesian;
-                  });
+        std::sort(
+            item.second.begin(), item.second.end(), [junction_point](const CagdCrvStruct *a, const CagdCrvStruct *b) {
+                int length = std::max(2, std::min(a->Length, b->Length) / 2 + 1);
+                for (int i = 1; i < length; i++)
+                {
+                    cv::Point2d a_point = cv::Point2d(a->Points[1][i], a->Points[2][1]);
+                    if (a->Length > 2 &&
+                        distance(a_point, cv::Point2d(junction_point)) >
+                            distance(cv::Point2d(a->Points[1][a->Length - 1 - i], a->Points[2][a->Length - 1 - i]),
+                                     cv::Point2d(junction_point)))
+                    {
+                        a_point = cv::Point2d(a->Points[1][a->Length - 1 - i], a->Points[2][a->Length - 1 - i]);
+                    }
+                    cv::Point2d b_point = cv::Point2d(b->Points[1][i], b->Points[2][i]);
+                    if (b->Length > 2 &&
+                        distance(b_point, cv::Point2d(junction_point)) >
+                            distance(cv::Point2d(b->Points[1][b->Length - 1 - i], b->Points[2][b->Length - 1 - i]),
+                                     cv::Point2d(junction_point)))
+                    {
+                        b_point = cv::Point2d(b->Points[1][b->Length - 1 - i], b->Points[2][b->Length - 1 - i]);
+                    }
+                    double a_cartesian = std::atan2(a_point.y - junction_point.y, a_point.x - junction_point.x);
+                    double b_cartesian = std::atan2(b_point.y - junction_point.y, b_point.x - junction_point.x);
+                    if (a_cartesian != b_cartesian)
+                    {
+                        return a_cartesian < b_cartesian;
+                    }
+                }
+                std::cerr << "Failed to sort curves " << junction_point << std::endl;
+                throw std::runtime_error("Failed to sort curves");
+            });
     }
 }
 
@@ -847,13 +860,15 @@ void SurfacesGenerator::generate_boundary_points()
                     CAGD_CRV_EVAL_E2(offset_curve, t, &point->Pt[0]);
                     cv::Point2d cv_point(point->Pt[0], point->Pt[1]);
                     if (closest_point_after_trim == cv::Point2d(-1, -1) ||
-                        distance(cv_point, cv::Point2d(boundary)) < distance(closest_point, cv::Point2d(boundary)))
+                        distance(cv_point, cv::Point2d(boundary)) <
+                            distance(closest_point_after_trim, cv::Point2d(boundary)))
                     {
                         closest_point_after_trim = cv_point;
                     }
                 }
             }
-            if (distance(closest_point, closest_point_after_trim) > 10)
+            if (std::abs(distance(closest_point, cv::Point2d(boundary)) -
+                         distance(closest_point_after_trim, cv::Point2d(boundary))) > 10)
             {
                 if (m_boundary_points.count(closest_junction) == 0)
                 {
@@ -873,6 +888,12 @@ void SurfacesGenerator::generate_boundary_points()
         for (const auto &item : item.second)
         {
             std::cout << "\t\t\t" << std::get<0>(item) << std::endl;
+            if (std::get<1>(item) != nullptr)
+            {
+                std::cout << "\t\t\t\t" << std::get<1>(item)->Points[1][0] << ", " << std::get<1>(item)->Points[2][0]
+                          << " - " << std::get<1>(item)->Points[1][std::get<1>(item)->Length - 1] << ", "
+                          << std::get<1>(item)->Points[2][std::get<1>(item)->Length - 1] << std::endl;
+            }
         }
     }
 }
@@ -1839,7 +1860,7 @@ bool SurfacesGenerator::compare_two_points_in_junction(
     {
         return true;
     }
-    if (*b_iter == junction_matcher.second.back() && a_cartesian < -M_PI / 2)
+    if (*b_iter == junction_matcher.second.back() && b_cartesian < -M_PI / 2)
     {
         return false;
     }
@@ -2089,8 +2110,8 @@ std::vector<IritPoint> SurfacesGenerator::get_neighborhood_points(
 #endif // DEBUG_NEIGHBORHOOD_SORT
             if (m_curve_to_offset_curves.count(curve) != 0 && !m_curve_to_offset_curves[curve].empty())
             {
-                std::cerr << "ERROR: Invalid curve in neighborhood" << std::endl;
-                throw std::runtime_error("Invalid curve in neighborhood");
+                std::cerr << "ERROR: Invalid curve in neighborhood, offset curve exists" << std::endl;
+                return std::vector<IritPoint>();
             }
             for (const auto &junction : m_curve_to_junctions[curve])
             {
@@ -2104,8 +2125,8 @@ std::vector<IritPoint> SurfacesGenerator::get_neighborhood_points(
                                   neighborhood_points[current_junction].end(), *current_iter);
             if (iter == neighborhood_points[current_junction].end())
             {
-                std::cerr << "ERROR: Invalid curve in neighborhood" << std::endl;
-                throw std::runtime_error("Invalid curve in neighborhood");
+                std::cerr << "ERROR: Invalid curve in neighborhood, can't find it in junction" << std::endl;
+                return std::vector<IritPoint>();
             }
             current_iter = iter;
         }
