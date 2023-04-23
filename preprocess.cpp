@@ -5,15 +5,19 @@
 
 #include "utils.h"
 
-PreprocessImage::PreprocessImage(const Image &image, bool should_convert_to_black_and_white, bool should_crop_to_fit,
-                                 int crop_to_fit_pad_left, int crop_to_fit_pad_right, int crop_to_fit_pad_top,
-                                 int crop_to_fit_pad_bottom, double island_threshold, bool should_add_border,
-                                 double scale_factor)
+PreprocessImage::PreprocessImage(const Image &image, double gamma, bool should_convert_to_black_and_white,
+                                 bool should_crop_to_fit, int crop_to_fit_pad_left, int crop_to_fit_pad_right,
+                                 int crop_to_fit_pad_top, int crop_to_fit_pad_bottom, double island_threshold,
+                                 bool should_add_border, double scale_factor)
     : m_grayscale_image(image)
     , m_scale_factor(scale_factor)
     , m_island_threshold(island_threshold)
     , m_checked(image.cols, std::vector<bool>(image.rows, false))
 {
+    if (gamma != 1.0)
+    {
+        TIMED_INNER_FUNCTION(gamma_correction(gamma), "Gamma correction");
+    }
     if (should_convert_to_black_and_white)
     {
         TIMED_INNER_FUNCTION(convert_to_black_and_white(), "Converting to black and white");
@@ -42,6 +46,19 @@ PreprocessImage::PreprocessImage(const Image &image, bool should_convert_to_blac
 cv::Mat &PreprocessImage::get_grayscale_image()
 {
     return m_grayscale_image;
+}
+
+void PreprocessImage::gamma_correction(double gamma)
+{
+    cv::Mat lookUpTable(1, 256, CV_8U);
+    uchar *p = lookUpTable.ptr();
+    for (int i = 0; i < 256; ++i)
+    {
+        p[i] = cv::saturate_cast<uchar>(pow(i / 255.0, gamma) * 255.0);
+    }
+    cv::Mat res = m_grayscale_image.clone();
+    cv::LUT(m_grayscale_image, lookUpTable, res);
+    m_grayscale_image = res;
 }
 
 void PreprocessImage::convert_to_black_and_white()

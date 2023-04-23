@@ -32,6 +32,7 @@ int main(int argc, char **argv)
         .help("Should not apply preprocessing to input image")
         .default_value(false)
         .implicit_value(true);
+    program.add_argument("-gc", "--gamma_correction").help("Gamma correction").default_value(1.0).scan<'g', double>();
     program.add_argument("-no_cbw", "--no_convert_to_black_and_white")
         .help("Should not convert to black and white")
         .default_value(false)
@@ -146,7 +147,8 @@ int main(int argc, char **argv)
     if (!program.get<bool>("--no_preprocessing"))
     {
         TIMED_FUNCTION(PreprocessImage preprocess_image(
-                           grayscale_image, !program.get<bool>("--no_convert_to_black_and_white"),
+                           grayscale_image, program.get<double>("--gamma_correction"),
+                           !program.get<bool>("--no_convert_to_black_and_white"),
                            !program.get<bool>("--no_crop_to_fit"), program.get<int>("--crop_to_fit_padding_left"),
                            program.get<int>("--crop_to_fit_padding_right"),
                            program.get<int>("--crop_to_fit_padding_top"),
