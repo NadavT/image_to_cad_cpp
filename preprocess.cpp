@@ -8,9 +8,8 @@
 PreprocessImage::PreprocessImage(const Image &image, double gamma, bool should_convert_to_black_and_white,
                                  bool should_crop_to_fit, int crop_to_fit_pad_left, int crop_to_fit_pad_right,
                                  int crop_to_fit_pad_top, int crop_to_fit_pad_bottom, double island_threshold,
-                                 bool should_add_border, double scale_factor)
+                                 bool should_add_border, double scale_factor, int scale_interpolation_method)
     : m_grayscale_image(image)
-    , m_scale_factor(scale_factor)
     , m_island_threshold(island_threshold)
     , m_checked(image.cols, std::vector<bool>(image.rows, false))
 {
@@ -37,7 +36,7 @@ PreprocessImage::PreprocessImage(const Image &image, double gamma, bool should_c
 
     if (scale_factor != 1.0)
     {
-        TIMED_INNER_FUNCTION(scale(), "Scaling");
+        TIMED_INNER_FUNCTION(scale(scale_factor, scale_interpolation_method), "Scaling");
     }
 
     cv::imwrite("preprocessed.png", m_grayscale_image);
@@ -122,11 +121,11 @@ void PreprocessImage::add_border()
     m_grayscale_image = bordered;
 }
 
-void PreprocessImage::scale()
+void PreprocessImage::scale(double scale_factor, int scale_interpolation_method)
 {
     cv::resize(m_grayscale_image, m_grayscale_image,
-               cv::Size(m_grayscale_image.cols * m_scale_factor, m_grayscale_image.rows * m_scale_factor), 0, 0,
-               cv::INTER_LINEAR);
+               cv::Size(m_grayscale_image.cols * scale_factor, m_grayscale_image.rows * scale_factor), 0, 0,
+               scale_interpolation_method);
 }
 
 std::list<cv::Point> PreprocessImage::get_near_surrounding(int x, int y, int color)

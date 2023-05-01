@@ -62,6 +62,9 @@ int main(int argc, char **argv)
         .default_value(25.0)
         .scan<'g', double>();
     program.add_argument("-s", "--scale").help("Scale factor").default_value(4.0).scan<'g', double>();
+    program.add_argument("-si", "--scale_interpolation")
+        .help("Scale interpolation method (linear|nearest|linear exact|nearest exact)")
+        .default_value(std::string("linear"));
     program.add_argument("-b", "--border")
         .help("Should add border (Should match with generated preprocessed image)")
         .default_value(false)
@@ -135,6 +138,29 @@ int main(int argc, char **argv)
         std::exit(1);
     }
 
+    int scale_interpolation;
+    if (program.get<std::string>("--scale_interpolation") == std::string("linear"))
+    {
+        scale_interpolation = cv::INTER_LINEAR;
+    }
+    else if (program.get<std::string>("--scale_interpolation") == std::string("nearest"))
+    {
+        scale_interpolation = cv::INTER_NEAREST;
+    }
+    else if (program.get<std::string>("--scale_interpolation") == std::string("linear exact"))
+    {
+        scale_interpolation = cv::INTER_LINEAR_EXACT;
+    }
+    else if (program.get<std::string>("--scale_interpolation") == std::string("nearest exact"))
+    {
+        scale_interpolation = cv::INTER_NEAREST_EXACT;
+    }
+    else
+    {
+        std::cerr << "Invalid scale interpolation method" << std::endl;
+        std::exit(1);
+    }
+
     if (!std::filesystem::exists(program.get<std::string>("--output_dir")))
     {
         std::filesystem::create_directories(program.get<std::string>("--output_dir"));
@@ -153,7 +179,7 @@ int main(int argc, char **argv)
                            program.get<int>("--crop_to_fit_padding_right"),
                            program.get<int>("--crop_to_fit_padding_top"),
                            program.get<int>("--crop_to_fit_padding_bottom"), program.get<double>("--islands_threshold"),
-                           program.get<bool>("--border"), program.get<double>("--scale")),
+                           program.get<bool>("--border"), program.get<double>("--scale"), scale_interpolation),
                        "Preprocessing");
         grayscale_image = preprocess_image.get_grayscale_image();
     }
