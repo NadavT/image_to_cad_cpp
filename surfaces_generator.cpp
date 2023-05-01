@@ -1705,7 +1705,7 @@ IritSurface SurfacesGenerator::generate_surface_from_pivot_and_points(const Irit
         auto &item = m_point_to_originating_curve[p0.get()][0];
         Curve a = Curve(CagdMergePtPtLen(p0.get(), pivot.get(), 2), CagdCrvFree);
         Curve b = Curve(CagdMergePtPtLen(pivot.get(), p1.get(), 2), CagdCrvFree);
-        Curve curve1 = Curve(CagdMergeCrvCrv(a.get(), b.get(), TRUE, 0.5), CagdCrvFree);
+        Curve curve1 = Curve(CagdMergePtPtLen(pivot.get(), pivot.get(), 2), CagdCrvFree);
         Curve curve2 = Curve(BzrCrvNew(4, CAGD_PT_E2_TYPE), CagdCrvFree);
 
         curve2->Points[1][0] = p0->Pt[0];
