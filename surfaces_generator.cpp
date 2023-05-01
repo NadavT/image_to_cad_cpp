@@ -958,7 +958,12 @@ void SurfacesGenerator::fill_holes()
         }
         last_vertex->Pnext = first_vertex;
         IPPolygonStruct *polygon = IPAllocPolygon(0, first_vertex, nullptr);
-        IPUpdatePolyPlane(polygon);
+        if (IPUpdatePolyPlane(polygon) == FALSE)
+        {
+            std::cerr << "ERROR: Failed to update polygon plane" << std::endl;
+            IPFreePolygon(polygon);
+            continue;
+        }
         IPPolygonStruct *polygons = GMSplitNonConvexPoly(polygon, FALSE);
         IPFreePolygon(polygon);
         for (IPPolygonStruct *current_polygon = polygons; current_polygon != nullptr;
@@ -985,7 +990,7 @@ void SurfacesGenerator::fill_holes()
                 std::tie(relative_curve, t0, t1) =
                     get_points_matching_curve(neighborhood_offset_curves, prev_point, current_point);
                 IritSurface surface = IritSurface(nullptr, CagdSrfFree);
-                if (relative_curve != nullptr)
+                if (false && relative_curve != nullptr)
                 {
                     if (t0 > t1)
                     {
