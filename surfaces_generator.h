@@ -114,6 +114,7 @@ class SurfacesGenerator
     std::unordered_map<cv::Point, double> m_junctions_radius;
     std::mutex m_junction_radius_lock;
     std::unordered_map<VertexDescriptor, std::vector<std::tuple<cv::Point, CagdCrvStruct *>>> m_boundary_points;
+    std::unordered_set<CagdCrvStruct *> m_marked_curves;
 };
 
 #endif /* SURFACES_GENERATOR_H */
