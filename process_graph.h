@@ -34,6 +34,7 @@ class ProcessGraph
     VertexDescriptorMap m_vertex_descriptor_map;
     std::unordered_set<Segment> m_added_edges;
 
+    bool m_add_border;
     double m_reduction_proximity;
     double m_hanging_threshold;
     double m_junction_collapse_threshold;

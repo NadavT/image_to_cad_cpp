@@ -10,6 +10,7 @@ ProcessGraph::ProcessGraph(Graph &graph, VertexDescriptorMap &map, std::unordere
     : m_graph(graph)
     , m_vertex_descriptor_map(map)
     , m_added_edges(added_edges)
+    , m_add_border(add_border)
     , m_reduction_proximity(reduction_proximity)
     , m_hanging_threshold(hanging_threshold)
     , m_junction_collapse_threshold(junction_collapse_threshold)
@@ -135,7 +136,7 @@ void ProcessGraph::remove_hanging(int width, int height)
     {
         Graph new_graph(m_graph);
         changed = false;
-        std::vector<VertexDescriptor> leafs;
+        std::vector<VertexDescriptor> leaves;
         for (const auto &vertex : boost::make_iterator_range(boost::vertices(new_graph)))
         {
             // std::cout << "degree: " << boost::out_degree(vertex, m_graph) << std::endl;
@@ -144,13 +145,17 @@ void ProcessGraph::remove_hanging(int width, int height)
             //     std::cout << "\t" << m_graph[boost::source(neighbor, m_graph)].p << ", "
             //               << m_graph[boost::target(neighbor, m_graph)].p << std::endl;
             // }
+            // cv::Point p = new_graph[vertex].p;
+            // if (boost::degree(vertex, m_graph) == 1 &&
+            //     (!m_add_border || (p.x > m_scale_factor * 2 + 1 && p.y > m_scale_factor * 2 + 1 &&
+            //                        p.x < width - m_scale_factor * 2 && p.y < height - m_scale_factor * 2)))
             if (boost::degree(vertex, m_graph) == 1)
             {
-                leafs.push_back(vertex);
+                leaves.push_back(vertex);
             }
         }
 
-        for (const auto &leaf : leafs)
+        for (const auto &leaf : leaves)
         {
             std::vector<VertexDescriptor> to_remove({leaf});
             auto edge = *(boost::out_edges(leaf, m_graph).first);
