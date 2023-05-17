@@ -987,11 +987,10 @@ void SurfacesGenerator::fill_holes()
         for (IPPolygonStruct *current_polygon = polygons; current_polygon != nullptr;
              current_polygon = current_polygon->Pnext)
         {
-            IritPoint pivot = IritPoint(CagdPtNew(), CagdPtFree);
-            GMComputeAverageVertex(current_polygon->PVertex, pivot->Pt, 1);
             IPVertexStruct *first_vertex = current_polygon->PVertex;
             IPVertexStruct *prev_vertex = first_vertex;
             IPVertexStruct *current_vertex = first_vertex->Pnext;
+            std::vector<std::pair<IritPoint, IritPoint>> polygon_lines;
             do
             {
                 IritPoint prev_point = IritPoint(CagdPtNew(), CagdPtFree);
@@ -1024,16 +1023,37 @@ void SurfacesGenerator::fill_holes()
                     // Curve pivot_curve = Curve(CagdMergeCrvCrv(a.get(), b.get(), TRUE, 0.5), CagdCrvFree);
                     // surface.reset(CagdRuledSrf(relative_curve, pivot_curve.get(), 2, 2));
                 }
-                surface.reset(
-                    CagdBilinearSrf(prev_point.get(), current_point.get(), pivot.get(), pivot.get(), CAGD_PT_E2_TYPE));
+                // surface.reset(
+                //     CagdBilinearSrf(prev_point.get(), current_point.get(), pivot.get(), pivot.get(),
+                //     CAGD_PT_E2_TYPE));
+                // fix_surface_orientation(surface);
+                // if (surface != nullptr)
+                // {
+                //     m_surfaces.push_back(std::move(surface));
+                // }
+                polygon_lines.push_back(std::make_pair(std::move(prev_point), std::move(current_point)));
+                prev_vertex = current_vertex;
+                current_vertex = current_vertex->Pnext;
+            } while (prev_vertex != first_vertex);
+            if (polygon_lines.size() % 2 == 0)
+            {
+                polygon_lines.erase(polygon_lines.begin() + polygon_lines.size() / 2 - 1);
+                polygon_lines.pop_back();
+            }
+            for (size_t i = 0; i < polygon_lines.size() / 2; i++)
+            {
+                const auto &line_1 = polygon_lines[i];
+                const auto &line_2 = polygon_lines[polygon_lines.size() - i - 1];
+                IritSurface surface =
+                    IritSurface(CagdBilinearSrf(line_1.first.get(), line_1.second.get(), line_2.second.get(),
+                                                line_2.first.get(), CAGD_PT_E2_TYPE),
+                                CagdSrfFree);
                 fix_surface_orientation(surface);
                 if (surface != nullptr)
                 {
                     m_surfaces.push_back(std::move(surface));
                 }
-                prev_vertex = current_vertex;
-                current_vertex = current_vertex->Pnext;
-            } while (prev_vertex != first_vertex);
+            }
         }
         IPFreePolygonList(polygons);
     }
