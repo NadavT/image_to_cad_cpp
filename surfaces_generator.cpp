@@ -615,12 +615,14 @@ void SurfacesGenerator::generate_surfaces_from_junctions()
                 std::cerr << "ERROR: Failed to find junction radius" << junction_point << std::endl;
                 throw std::runtime_error("Failed to find junction radius");
             }
-            std::vector<Curve> junction_bounding_curves;
+            // std::vector<Curve> junction_bounding_curves;
+            std::vector<std::pair<CagdPtStruct *, CagdPtStruct *>> polygon_lines;
             for (int i = 0; i < points.size(); i++)
             {
                 int j = (i + 1) % points.size();
-                junction_bounding_curves.push_back(
-                    generate_curve_from_points(points[i], points[j], m_junctions_radius[junction_point]));
+                // junction_bounding_curves.push_back(
+                //     generate_curve_from_points(points[i], points[j], m_junctions_radius[junction_point]));
+                polygon_lines.push_back({points[i].get(), points[j].get()});
                 // IritSurface surface = generate_surface_from_pivot_and_points(pivot, points[i], points[j],
                 //                                                              m_junctions_radius[junction_point]);
                 // fix_surface_orientation(surface, false);
@@ -653,43 +655,60 @@ void SurfacesGenerator::generate_surfaces_from_junctions()
                     }
                 }
             }
-            size_t first_index = (first_have_common_curve) ? 1 : 0;
-            for (size_t i = first_have_common_curve; i < junction_bounding_curves.size() / 2; i++)
+            if (polygon_lines.size() % 2 == 0)
             {
-                size_t j = junction_bounding_curves.size() - 1 - i + (first_have_common_curve ? 1 : -1);
-                if (i == j)
-                {
-                    break;
-                }
+                polygon_lines.erase(polygon_lines.begin() + polygon_lines.size() / 2 - 1);
+                polygon_lines.pop_back();
+            }
+            for (size_t i = 0; i < polygon_lines.size() / 2; i++)
+            {
+                const auto &line_1 = polygon_lines[i];
+                const auto &line_2 = polygon_lines[polygon_lines.size() - i - 1];
                 IritSurface surface = IritSurface(
-                    CagdRuledSrf(junction_bounding_curves[i].get(),
-                                 Curve(CagdCrvReverse(junction_bounding_curves[j].get()), CagdCrvFree).get(), 2, 2),
+                    CagdBilinearSrf(line_1.first, line_1.second, line_2.second, line_2.first, CAGD_PT_E2_TYPE),
                     CagdSrfFree);
-                fix_surface_orientation(surface, false);
+                fix_surface_orientation(surface);
                 if (surface != nullptr)
                 {
                     m_surfaces.push_back(std::move(surface));
                 }
-                else
-                {
-                    IritPoint curve1_start = IritPoint(CagdPtNew(), CagdPtFree);
-                    CAGD_CRV_EVAL_E2(junction_bounding_curves[i].get(), 0, &curve1_start->Pt[0]);
-                    IritPoint curve1_end = IritPoint(CagdPtNew(), CagdPtFree);
-                    CAGD_CRV_EVAL_E2(junction_bounding_curves[i].get(), 1, &curve1_end->Pt[0]);
-                    IritPoint curve2_start = IritPoint(CagdPtNew(), CagdPtFree);
-                    CAGD_CRV_EVAL_E2(junction_bounding_curves[j].get(), 1, &curve2_start->Pt[0]);
-                    IritPoint curve2_end = IritPoint(CagdPtNew(), CagdPtFree);
-                    CAGD_CRV_EVAL_E2(junction_bounding_curves[j].get(), 0, &curve2_end->Pt[0]);
-                    Curve curve1 = Curve(CagdMergePtPtLen(curve1_start.get(), curve1_end.get(), 2), CagdCrvFree);
-                    Curve curve2 = Curve(CagdMergePtPtLen(curve2_start.get(), curve2_end.get(), 2), CagdCrvFree);
-                    IritSurface surface = IritSurface(CagdRuledSrf(curve1.get(), curve2.get(), 2, 2), CagdSrfFree);
-                    fix_surface_orientation(surface);
-                    if (surface != nullptr)
-                    {
-                        m_surfaces.push_back(std::move(surface));
-                    }
-                }
             }
+            // for (size_t i = first_have_common_curve; i < junction_bounding_curves.size() / 2; i++)
+            // {
+            //     size_t j = junction_bounding_curves.size() - 1 - i + (first_have_common_curve ? 1 : -1);
+            //     if (i == j)
+            //     {
+            //         break;
+            //     }
+            //     IritSurface surface = IritSurface(
+            //         CagdRuledSrf(junction_bounding_curves[i].get(),
+            //                      Curve(CagdCrvReverse(junction_bounding_curves[j].get()), CagdCrvFree).get(), 2, 2),
+            //         CagdSrfFree);
+            //     fix_surface_orientation(surface, false);
+            //     if (false && surface != nullptr)
+            //     {
+            //         m_surfaces.push_back(std::move(surface));
+            //     }
+            //     else
+            //     {
+            //         IritPoint curve1_start = IritPoint(CagdPtNew(), CagdPtFree);
+            //         CAGD_CRV_EVAL_E2(junction_bounding_curves[i].get(), 0, &curve1_start->Pt[0]);
+            //         IritPoint curve1_end = IritPoint(CagdPtNew(), CagdPtFree);
+            //         CAGD_CRV_EVAL_E2(junction_bounding_curves[i].get(), 1, &curve1_end->Pt[0]);
+            //         IritPoint curve2_start = IritPoint(CagdPtNew(), CagdPtFree);
+            //         CAGD_CRV_EVAL_E2(junction_bounding_curves[j].get(), 1, &curve2_start->Pt[0]);
+            //         IritPoint curve2_end = IritPoint(CagdPtNew(), CagdPtFree);
+            //         CAGD_CRV_EVAL_E2(junction_bounding_curves[j].get(), 0, &curve2_end->Pt[0]);
+            //         Curve curve1 = Curve(CagdMergePtPtLen(curve1_start.get(), curve1_end.get(), 2), CagdCrvFree);
+            //         Curve curve2 = Curve(CagdMergePtPtLen(curve2_start.get(), curve2_end.get(), 2), CagdCrvFree);
+            //         IritSurface surface = IritSurface(CagdRuledSrf(curve1.get(), curve2.get(), 2, 2), CagdSrfFree);
+            //         fix_surface_orientation(surface);
+            //         if (surface != nullptr)
+            //         {
+            //             m_surfaces.push_back(std::move(surface));
+            //         }
+            //     }
+            // }
             // Curve junction_curve1 = Curve(CagdCrvCopy(junction_bounding_curves[0].get()), CagdCrvFree);
             // Curve junction_curve2 =
             //     Curve(CagdCrvCopy(junction_bounding_curves[junction_bounding_curves.size() / 2].get()), CagdCrvFree);
